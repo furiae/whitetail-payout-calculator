@@ -10,31 +10,18 @@ const ninthPlacePayout = document.querySelector('#top-ten tr:nth-child(9) td:nth
 const tenthPlacePayout = document.querySelector('#top-ten tr:nth-child(10) td:nth-child(2)')
 
 const firstFivePayout = document.querySelector('#outside-top-ten tr td:nth-child(2)')
-const firstFive = document.getElementById('11th-15th')
 const secondFivePayout = document.querySelector('#outside-top-ten tr:nth-child(2) td:nth-child(2)')
-const secondFive = document.getElementById('16th-20th')
 const thirdFivePayout = document.querySelector('#outside-top-ten tr:nth-child(3) td:nth-child(2)')
-const thirdFive = document.getElementById('21st-25th')
 const fourthFivePayout = document.querySelector('#outside-top-ten tr:nth-child(4) td:nth-child(2)')
-const fourthFive = document.getElementById('26th-30th')
 const fifthFivePayout = document.querySelector('#outside-top-ten tr:nth-child(5) td:nth-child(2)')
-const fifthFive = document.getElementById('31st-35th')
 const sixthFivePayout = document.querySelector('#outside-top-ten tr:nth-child(6) td:nth-child(2)')
-const sixthFive = document.getElementById('36th-40th')
 const seventhFivePayout = document.querySelector('#outside-top-ten tr:nth-child(7) td:nth-child(2)')
-const seventhFive = document.getElementById('41st-45th')
 const eighthFivePayout = document.querySelector('#outside-top-ten tr:nth-child(8) td:nth-child(2)')
-const eighthFive = document.getElementById('46th-50th')
 const ninthFivePayout = document.querySelector('#outside-top-ten tr:nth-child(9) td:nth-child(2)')
-const ninthFive = document.getElementById('51st-55th')
 const tenthFivePayout = document.querySelector('#outside-top-ten tr:nth-child(10) td:nth-child(2)')
-const tenthFive = document.getElementById('56th-60th')
 const eleventhFivePayout = document.querySelector('#outside-top-ten tr:nth-child(11) td:nth-child(2)')
-const eleventhFive = document.getElementById('61st-65th')
 const twelvethFivePayout = document.querySelector('#outside-top-ten tr:nth-child(12) td:nth-child(2)')
-const twelvethFive = document.getElementById('66th-70th')
 const lastFivePayout = document.querySelector('#outside-top-ten tr:nth-child(13) td:nth-child(2)')
-const lastFive = document.getElementById('71st-75th')
 
 const tenPointPayout = document.querySelector('#special-harvest tr td:nth-child(2)')
 const ninePointPayout = document.querySelector('#special-harvest tr:nth-child(2) td:nth-child(2)')
@@ -57,6 +44,34 @@ const grossMargin = document.getElementById('gross-margin')
 
 const entriesForm = document.querySelector('#hunter-entries');
 const entryFeeForm = document.querySelector('#entry-fee');
+const entriesInput = document.getElementById('hunter-entries-input');
+const entryFeeInput = document.getElementById('entry-fee-input');
+const inputError = document.getElementById('input-error');
+
+// Whole-dollar currency formatting, e.g. 155250 -> "$155,250"
+const usd = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+});
+
+// Read a whole positive number from an input, tolerating commas, spaces and "$".
+// Returns null when the field is unusable so callers can keep the previous value.
+function readPositiveInt(input) {
+    const raw = String(input.value).replace(/[$,\s]/g, '');
+    if (raw === '') return null;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 1) return null;
+    return Math.floor(parsed);
+}
+
+function showInputError(message) {
+    inputError.innerText = message;
+}
+
+function clearInputError() {
+    inputError.innerText = '';
+}
 
 // Master Payouts Object to update with new calculations and reference for UI / DOM manipulation
 const payouts = {
@@ -102,45 +117,36 @@ let hEntries = 2500;
 // Set default entry fee value and calculate 
 let entryFee = 100;
 calcNewPayout(hEntries, entryFee)
-// Event listener for new Hunter Entries submissions
-entriesForm.addEventListener('submit', function(e){
-    console.log('submit')
+// Both forms behave the same way: re-read BOTH fields, validate, then recalculate.
+// Reading both matters because a user can type a new entry fee and then press Enter
+// in the entries field (or vice versa) and expect both values to apply.
+function handleSubmit(e) {
     e.preventDefault();
 
-        hEntries = document.querySelector('input[id ="hunter-entries"]').value;
-//    If there were additional 'deep payouts' added to the DOM 
-// remove them prior to a new payout calculation
-   if (document.querySelectorAll('#new-payout')){
-        let oldPayouts = (document.querySelectorAll('#new-payout'));
-        oldPayouts.forEach(payout => payout.remove());
-}
-     
-    calcNewPayout(hEntries, entryFee);
+    const nextEntries = readPositiveInt(entriesInput);
+    const nextFee = readPositiveInt(entryFeeInput);
 
-})
+    // A blank field means "leave it as it was"; anything else unusable is an error.
+    const entriesBlank = String(entriesInput.value).trim() === '';
+    const feeBlank = String(entryFeeInput.value).trim() === '';
 
-entryFeeForm.addEventListener('submit', function(e){
-    e.preventDefault()
-
-    entryFee = document.querySelector('input[id ="entry-fee"]').value;
-    hEntries = document.querySelector('input[id ="hunter-entries"]').value;
-    !hEntries? hEntries=2500 : undefined 
-
-    if (document.querySelectorAll('#new-payout')){
-        let oldPayouts = (document.querySelectorAll('#new-payout'));
-        oldPayouts.forEach(payout => payout.remove());
+    if ((nextEntries === null && !entriesBlank) || (nextFee === null && !feeBlank)) {
+        showInputError('Enter whole numbers greater than zero for hunter entries and entry fee.');
+        return;
     }
 
-    calcNewPayout(hEntries, entryFee)
-})
+    clearInputError();
+    if (nextEntries !== null) hEntries = nextEntries;
+    if (nextFee !== null) entryFee = nextFee;
+
+    calcNewPayout(hEntries, entryFee);
+}
+
+entriesForm.addEventListener('submit', handleSubmit);
+entryFeeForm.addEventListener('submit', handleSubmit);
 
 function roundTwoFidy(num){
     num = num - num % 250;
-    return num;
-};
-
-function roundOneTwentyFive(num){
-    num = num - num % 125;
     return num;
 };
 
@@ -249,7 +255,6 @@ function calcNewPayout(num, entryFee) {
     //    let apexHunterPurse = (num * entryFee) * .65
     //     console.log("Entry Fee===", entryFee)
     //     console.log("apexHunterPurse===", apexHunterPurse)
-        console.log("payouts===", payouts)
     // If Entries are less than 20, the top Ten Purse gets all of the apexHunter Purse 
     //    let topTenPurse = 0  
     //     if (num > 19){
@@ -314,7 +319,6 @@ function calcNewPayout(num, entryFee) {
         
             if (topPlaces === 10 && num >= 500) {
                 payouts["1st"] = Math.max(roundTwoFidy((num * 6) * (entryFee/100)), entryFee * 3)
-                debugger
                 payouts["2nd"] = Math.max(roundTwoFidy((num * 5) * (entryFee/100)), entryFee * 3)
                 payouts["3rd"] = Math.max(roundTwoFidy((num * 4) * (entryFee/100)), entryFee * 3)
                 payouts["4th"] = Math.max(roundTwoFidy((num * 3.5) * (entryFee/100)), entryFee * 3)
@@ -346,39 +350,9 @@ function calcNewPayout(num, entryFee) {
                         payouts[p] = 0
                     }
                 }
-            } 
-            // else if ( num < 200 ) {
-            //     payouts["1st"] = Math.max(roundToNearestHundred(num * 6), entryFee*5)
-            //     payouts["2nd"] = Math.max(roundToNearestHundred(num * 5), entryFee*4.75)
-            //     payouts["3rd"] = Math.max(roundToNearestHundred(num * 4), entryFee * 4.5)
-            //     payouts["4th"] = Math.max(roundToNearestHundred(num * 3.5), entryFee * 4.25)
-            //     payouts["5th"] = Math.max(roundToNearestHundred(num * 3), entryFee * 4)
-            //     payouts["6th"] = Math.max(roundToNearestFiddy(num * 3 - (entryFee *1)), entryFee * 3.75)
-            //     payouts["7th"] = Math.max(roundToNearestFiddy(num * 3 - (entryFee *2)), entryFee * 3.5)
-            //     payouts["8th"] = Math.max(roundToNearestFiddy(num * 3 - (entryFee *3)), entryFee * 3.35)
-            //     payouts["9th"] = Math.max(roundToNearestFiddy(num * 3 - (entryFee *4)), entryFee * 3.2)
-            //     payouts["10th"] = Math.max(roundToNearestFiddy(num * 3 - (entryFee *5)), entryFee * 3)
-
-            //     if (topPlaces < 10) {
-            //         const nonPaidNumber = 10 - topPlaces
-            //         const changePayoutsToZeroArr = topTenPayouts.slice(-nonPaidNumber)
-            //         for (let p of changePayoutsToZeroArr) {
-            //             payouts[p] = 0
-            //         }
-            //     }
-            // } 
-            
-            else {
-                  // if less than 100 entries keep the template above for the base payouts but 
-                // only pay 1 place per 10 entries (minimum of 3) and mark the non paid places to 0 in the payouts object
-                if (topPlaces < 10) {
-                    const nonPaidNumber = 10 - topPlaces
-                    const changePayoutsToZeroArr = topTenPayouts.slice(-nonPaidNumber)
-                    for (let p of changePayoutsToZeroArr) {
-                        payouts[p] = 0
-                    }
-                }
             }
+            // No further branch is needed: num >= 500 always yields topPlaces === 10,
+            // so the two cases above are exhaustive.
 
         // check to make sure top scores aren't the same after rounding
         const checkPayouts = ['1st','2nd','3rd','4th','5th','6th','7th','8th','9th','10th'].slice(0,topPlaces);
@@ -390,7 +364,8 @@ function calcNewPayout(num, entryFee) {
             }      
         }
         // second loop to refine similar top payouts
-        for (let i = 0; i < topPlaces - 1; i++) {
+        // Starts at i = 1: this reads the place above (i-1), which does not exist for 1st.
+        for (let i = 1; i < topPlaces - 1; i++) {
             if (payouts[checkPayouts[i]] === payouts[checkPayouts[i+1]]) {
                 payouts[checkPayouts[i]] += roundToTen((payouts[checkPayouts[i-1]] - payouts[checkPayouts[i]]) / 2);
             }
@@ -464,58 +439,62 @@ function calcNewPayout(num, entryFee) {
         for (let p of outsideTopTenPayouts) {
             outsidePayoutsAdd += payouts[p] * 4
         }
-        console.log('outsidePayoutsAdd===',outsidePayoutsAdd)
         payouts['hunterPayout'] = Object.values(payouts).reduce((a,b) => a+b) + outsidePayoutsAdd
         payouts['grossRevenue'] = hEntries * entryFee
         payouts['grossMargin'] = payouts['grossRevenue'] - payouts['hunterPayout']
         payouts['marginPercent'] = Math.round(payouts['grossMargin'] / payouts['grossRevenue'] * 100)
         payouts['payoutModel'] = num
-        console.log(payouts)
 
-        // Now manipulating html for front end display for the default 500 entry model
-        firstPlacePayout.innerText = `$${payouts['1st']}`
-        secondPlacePayout.innerText = `$${payouts['2nd']}`
-        thirdPlacePayout.innerText = `$${payouts['3rd']}`
-        fourthPlacePayout.innerText = `$${payouts['4th']}`
-        fifthPlacePayout.innerText = `$${payouts['5th']}`
-        sixthPlacePayout.innerText = `$${payouts['6th']}`
-        seventhPlacePayout.innerText = `$${payouts['7th']}`
-        eighthPlacePayout.innerText = `$${payouts['8th']}`
-        ninthPlacePayout.innerText = `$${payouts['9th']}`
-        tenthPlacePayout.innerText = `$${payouts['10th']}`
-  
-        firstFivePayout.innerText = `$${payouts['11th-15th']}`                               
-        secondFivePayout.innerText = `$${payouts['16th-20th']}`
-        thirdFivePayout.innerText = `$${payouts['21st-25th']}`
-        fourthFivePayout.innerText = `$${payouts['26th-30th']}`
-        fifthFivePayout.innerText = `$${payouts['31st-35th']}`
-        sixthFivePayout.innerText = `$${payouts['36th-40th']}`
-        seventhFivePayout.innerText = `$${payouts['41st-45th']}`
-        eighthFivePayout.innerText = `$${payouts['46th-50th']}`
-        ninthFivePayout.innerText = `$${payouts['51st-55th']}`
-        tenthFivePayout.innerText = `$${payouts['56th-60th']}`
-        eleventhFivePayout.innerText = `$${payouts['61st-65th']}`
-        twelvethFivePayout.innerText = `$${payouts['66th-70th']}`
-        lastFivePayout.innerText = `$${payouts['71st-75th']}`
+        // Now manipulating html for front end display.
+        // One cell -> one payout key, so the table and the model cannot drift apart.
+        const payoutCells = [
+            [firstPlacePayout, '1st'],
+            [secondPlacePayout, '2nd'],
+            [thirdPlacePayout, '3rd'],
+            [fourthPlacePayout, '4th'],
+            [fifthPlacePayout, '5th'],
+            [sixthPlacePayout, '6th'],
+            [seventhPlacePayout, '7th'],
+            [eighthPlacePayout, '8th'],
+            [ninthPlacePayout, '9th'],
+            [tenthPlacePayout, '10th'],
+            [firstFivePayout, '11th-15th'],
+            [secondFivePayout, '16th-20th'],
+            [thirdFivePayout, '21st-25th'],
+            [fourthFivePayout, '26th-30th'],
+            [fifthFivePayout, '31st-35th'],
+            [sixthFivePayout, '36th-40th'],
+            [seventhFivePayout, '41st-45th'],
+            [eighthFivePayout, '46th-50th'],
+            [ninthFivePayout, '51st-55th'],
+            [tenthFivePayout, '56th-60th'],
+            [eleventhFivePayout, '61st-65th'],
+            [twelvethFivePayout, '66th-70th'],
+            [lastFivePayout, '71st-75th'],
+            [tenPointPayout, '10PT Drawing'],
+            [ninePointPayout, '9PT Drawing'],
+            [eightPointPayout, '8PT Drawing'],
+            [sevenPointPayout, '7PT Drawing'],
+            [hundredthPayout, '100th'],
+            [twoHundredthPayout, '200th'],
+            [threeHundredthPayout, '300th'],
+            [fourHundredthPayout, '400th'],
+            [fiveHundredthPayout, '500th'],
+            [sevenFidyPayout, '750th'],
+            [thousandthPayout, '1000th'],
+            [twelvehunnaFidyPayout, '1250th'],
+        ]
+        for (const [cell, key] of payoutCells) {
+            cell.innerText = usd.format(payouts[key])
+        }
 
-        // Apply special harvest payouts to the DOM
-        tenPointPayout.innerText = `$${payouts['10PT Drawing']}`
-        ninePointPayout.innerText = `$${payouts['9PT Drawing']}`
-        eightPointPayout.innerText = `$${payouts['8PT Drawing']}`
-        sevenPointPayout.innerText = `$${payouts['7PT Drawing']}`
-        hundredthPayout.innerText = `$${payouts['100th']}`
-        twoHundredthPayout.innerText = `$${payouts['200th']}`
-        threeHundredthPayout.innerText = `$${payouts['300th']}`
-        fourHundredthPayout.innerText = `$${payouts['400th']}`
-        fiveHundredthPayout.innerText = `$${payouts['500th']}`
-        sevenFidyPayout.innerText = `$${payouts['750th']}`
-        thousandthPayout.innerText = `$${payouts['1000th']}`
-        twelvehunnaFidyPayout.innerText = `$${payouts['1250th']}`
         // Apply Payout info to the DOM
-        hunterEntries.innerText = `${hEntries}`
-        payoutModel.innerText = `${payouts['payoutModel']}`
-        grossRevenue.innerText = `$${payouts['grossRevenue']}`
-        hunterPayout.innerText = `$${payouts['hunterPayout']}`
-        grossMargin.innerText = `$${payouts['grossMargin']} (${payouts['marginPercent']}%)`
+        hunterEntries.innerText = Number(hEntries).toLocaleString('en-US')
+        payoutModel.innerText = Number(payouts['payoutModel']).toLocaleString('en-US')
+        grossRevenue.innerText = usd.format(payouts['grossRevenue'])
+        hunterPayout.innerText = usd.format(payouts['hunterPayout'])
+        grossMargin.innerText = `${usd.format(payouts['grossMargin'])} (${payouts['marginPercent']}%)`
+        // A payout that exceeds revenue is a loss, not a profit - do not show it in green.
+        grossMargin.classList.toggle('negative', payouts['grossMargin'] < 0)
 
 }

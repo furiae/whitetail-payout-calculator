@@ -20,36 +20,38 @@
                     <th>Payout Model</th>
                 </tr>
                 <tr>
-                    <td>500</td>
-                    <td>500</td>
+                    <td>2,500</td>
+                    <td>2,500</td>
                 <tr>
                     <th>Gross Revenue</th>
                     <th>Hunter Payout</th>
                 </tr>
                 <tr>
-                    <td>$62,500</td>
-                    <td>$62,000</td>
+                    <td>$250,000</td>
+                    <td>$155,250</td>
                 </tr>
             </thead>
         </table>
-  
-    
+
+
     <h3>Gross Margin</h3>
-        <h4 id="gross-margin">$250</h4>
+        <h4 id="gross-margin">$94,750 (38%)</h4>
     </div>
 </div>
 
     <form id="hunter-entries" action="submit">
-        <label for="hunter-entries">HUNTER ENTRIES</label>
-        <input type="text" placeholder="2500" id="hunter-entries">
+        <label for="hunter-entries-input">HUNTER ENTRIES</label>
+        <input type="text" inputmode="numeric" placeholder="2500" id="hunter-entries-input">
         <button>Submit</button>
     </form>
 
     <form id="entry-fee" action="submit">
-        <label for="entry-fee">ENTRY FEE</label>
-        <input type="text" placeholder="100" id="entry-fee">
+        <label for="entry-fee-input">ENTRY FEE</label>
+        <input type="text" inputmode="numeric" placeholder="100" id="entry-fee-input">
         <button>Submit</button>
     </form>
+
+    <p id="input-error" class="input-error" role="status" aria-live="polite"></p>
 
     <div class="row-container">
     <div id="row">
@@ -125,8 +127,8 @@
                 <td>16th-20th</td>
                 <td>$1,000</td>
             </tr>
-            <tr id="21st-35th">
-                <td>21st-35th</td>
+            <tr id="21st-25th">
+                <td>21st-25th</td>
                 <td>$1,000</td>
             </tr>
             <tr id="26th-30th">
@@ -241,7 +243,6 @@
 </div>
 </div>
 </div>
-    <!-- <script src="turkeyCalcV3.js"></script> -->
     <script src="whitetailCalcV4.js"></script>
 </body>
 </html>

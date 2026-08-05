@@ -12,7 +12,8 @@ table{
 
 h1 {
     text-align: center;
-    font-size: 5em;
+    /* Was a flat 5em (80px), which overflowed narrow screens. */
+    font-size: clamp(2rem, 7vw, 5rem);
     /* margin: 50px 0px 25px; */
 }
 
@@ -26,11 +27,12 @@ form {
     display: flex;
     justify-content: center;
     align-items: center;
+    flex-wrap: wrap;
     margin: 0 0 0 0;
 }
 
 label {
-    font-size: 2.5em;
+    font-size: clamp(1.25rem, 4vw, 2.5rem);
     margin: 20px;
     font-weight: 500;
 }
@@ -69,6 +71,12 @@ td{
     font-size: 1.25em;
 }
 
+/* The summary table is the widest thing on the page; let it scroll inside its
+   own panel rather than pushing the whole document sideways. */
+.payout-info {
+    overflow-x: auto;
+}
+
 #payout-nums td {
     font-size: 1.25em;
 }
@@ -81,7 +89,7 @@ h3{
 }
 h4{
     text-align: center;
-    font-size: 2.5em;
+    font-size: clamp(1.4rem, 5vw, 2.5rem);
     color: green;
     /* color: #ff0000; */
     margin: .25em;
@@ -113,7 +121,7 @@ tr {
 }
 
 h3 {
-    font-size: 2.5em !important;
+    font-size: clamp(1.4rem, 5vw, 2.5rem) !important;
 }
 
 .row-container {
@@ -122,15 +130,19 @@ h3 {
 }
 
 #row {
-    width: 70%;
+    width: 100%;
+    max-width: 1250px;
     display: flex;
-    margin: 20px 80px 80px 80px;
+    /* Wrap instead of overflowing: three 400px cards do not fit a phone or a
+       narrow embed column. */
+    flex-wrap: wrap;
+    margin: 20px auto 80px;
     justify-content: center;
 }
 
 .leaderboard {
-    width: 30%;
-    min-width: 400px;
+    flex: 1 1 320px;
+    min-width: 0;
     max-width: 500px;
     background-color: rgba(128, 128, 128, 0.69);
     margin: 1%;
@@ -139,10 +151,11 @@ h3 {
 }
 .payout-info {
     padding-top: 1.5%;
-    width: 63%;
-    min-width: 1250px;
+    width: 100%;
+    /* Was min-width: 1250px, which pushed this panel off the left edge of any
+       viewport narrower than that, with no way to scroll it back into view. */
+    max-width: 1250px;
     text-align: center;
-    margin: auto;
     margin-top: 0px;
     letter-spacing: .2em;
     background-color: rgba(128, 128, 128, 0.69);
@@ -171,8 +184,19 @@ h5 {
 
 }
 
-@media screen and (min-width: 500px) {
-    button {
-        display: none
-    };
+/* The Submit buttons used to be hidden on every screen wider than 500px, which
+   left desktop users with no way to recalculate except pressing Enter. */
+button {
+    font-size: 1.25em;
+    padding: 8px 20px;
+    border-radius: 15px;
+    cursor: pointer;
+}
+
+.input-error {
+    text-align: center;
+    font-size: 1.25em;
+    color: #a10000;
+    margin: 0 1em 1em;
+    min-height: 1.4em;
 }
