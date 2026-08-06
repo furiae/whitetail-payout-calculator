@@ -136,6 +136,40 @@ function distributeWithFloor(pool, weights, maxStep, floor) {
     return weights.map(() => 0);
 }
 
+// Apply per-place ceilings. Anything over a cap is first offered to places that
+// are still under theirs (highest place first), and whatever still will not fit
+// is returned as overflow for the other boards to absorb.
+//
+// Ordering is safe because the caps themselves descend: a place can never be
+// topped up past the place above it.
+function applyCaps(prizes, caps, step) {
+    if (!caps) return { prizes, overflow: 0 };
+
+    const capped = prizes.map((amount, i) => {
+        const cap = caps[i];
+        return typeof cap === 'number' ? Math.min(amount, cap) : amount;
+    });
+    let overflow = prizes.reduce((a, b) => a + b, 0) - capped.reduce((a, b) => a + b, 0);
+
+    // Top up places that still have headroom, in whole steps.
+    let guard = 0;
+    let progress = true;
+    while (overflow >= step && progress && guard < 10000) {
+        progress = false;
+        for (let i = 0; i < capped.length && overflow >= step; i++) {
+            const cap = caps[i];
+            // Only pay places that were already winning something.
+            if (capped[i] <= 0) continue;
+            if (typeof cap === 'number' && capped[i] + step > cap) continue;
+            capped[i] += step;
+            overflow -= step;
+            progress = true;
+        }
+        guard++;
+    }
+    return { prizes: capped, overflow };
+}
+
 // --- board shape -----------------------------------------------------------
 
 function payoutModel(entries) {
@@ -196,6 +230,8 @@ function buildBoard(entries, entryFee) {
     let topPrizes = [];
     let perSeat = [];
     let specialPrizes = [];
+    // Capped money with nowhere to go, because no other board has unlocked yet.
+    let unallocated = 0;
 
     for (let pass = 0; pass < 4; pass++) {
         const activeTotal = Object.keys(active)
@@ -205,17 +241,29 @@ function buildBoard(entries, entryFee) {
             ? CONFIG.purseSplit[key] / activeTotal
             : 0);
 
-        topPrizes = distributeWithFloor(
+        const topStep = stepFor(CONFIG.topTen.rounding, model);
+        const uncapped = distributeWithFloor(
             purse * shareOf('topTen'),
             CONFIG.topTen.weights.slice(0, places),
-            stepFor(CONFIG.topTen.rounding, model),
+            topStep,
             floor);
+        const capped = applyCaps(uncapped, CONFIG.topTen.caps, topStep);
+        topPrizes = capped.prizes;
+
+        // Money the top ten could not hold is shared between the other boards in
+        // proportion to their normal split, so the caps make those prizes bigger
+        // rather than making the house richer.
+        const otherShare = shareOf('outsideTopTen') + shareOf('specialHarvest');
+        const overflowFor = key => (otherShare > 0
+            ? capped.overflow * (shareOf(key) / otherShare)
+            : 0);
+        unallocated = otherShare > 0 ? 0 : capped.overflow;
 
         // Every bracket pays `placesPerTier` hunters the same amount, so share
         // out a per-seat pool and let each bracket cost placesPerTier x that.
         perSeat = active.outsideTopTen
             ? distributeWithFloor(
-                (purse * shareOf('outsideTopTen')) / placesPerTier,
+                (purse * shareOf('outsideTopTen') + overflowFor('outsideTopTen')) / placesPerTier,
                 tierWeights,
                 stepFor(CONFIG.outsideTopTen.rounding, model),
                 floor)
@@ -223,7 +271,7 @@ function buildBoard(entries, entryFee) {
 
         specialPrizes = active.specialHarvest
             ? distributeWithFloor(
-                purse * shareOf('specialHarvest'),
+                purse * shareOf('specialHarvest') + overflowFor('specialHarvest'),
                 specialEntries.map(e => e.weight),
                 stepFor(CONFIG.specialHarvest.rounding, model),
                 floor)
@@ -269,7 +317,7 @@ function buildBoard(entries, entryFee) {
     return {
         entries, entryFee, model, revenue, hunterPayout, grossMargin,
         marginPercent: revenue > 0 ? Math.round((grossMargin / revenue) * 100) : 0,
-        topRows, outsideRows, specialRows,
+        topRows, outsideRows, specialRows, unallocated,
     };
 }
 

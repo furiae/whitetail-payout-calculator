@@ -57,6 +57,15 @@ const CONFIG = {
         // 10th), so the prize list still "feels" the same.
         weights: [6, 5, 4, 3.5, 2, 1.6, 1.55, 1.5, 1.45, 1.4],
 
+        // Hard ceiling per place, in dollars. Once a big field pushes a place
+        // past its cap the extra does NOT stay with the house: it first tops up
+        // any top-ten place still under its own cap, and whatever is left flows
+        // into the outside-top-10 and special harvest boards. The margin is
+        // unchanged either way - the money just lands somewhere better.
+        //
+        // Set to null to remove the ceilings entirely.
+        caps: [25000, 22500, 20000, 17500, 15000, 12500, 10000, 7500, 5000, 2500],
+
         // Round each prize down to a tidy number. First matching rule wins.
         rounding: [
             { minModel: 350, step: 250 },
