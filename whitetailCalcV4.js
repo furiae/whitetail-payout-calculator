@@ -172,6 +172,36 @@ function applyCaps(prizes, caps, step) {
     return { prizes: capped, overflow };
 }
 
+// The point-class drawings are all-or-nothing: 10PT, 9PT, 8PT and 7PT are
+// unveiled together or not at all. Awarding 10PT on its own is not a thing.
+//
+// So the drawings are tried as one block. Milestones are individually optional
+// and get trimmed from the bottom first, because they are the cheaper prizes.
+// If the block still cannot be funded with every member clearing the floor, all
+// four are dropped and the money goes to whatever else the board can pay.
+function distributeSpecialBoard(pool, drawings, milestones, step, floor) {
+    const attempt = (withDrawings, milestoneCount) => {
+        const entries = (withDrawings ? drawings : [])
+            .concat(milestones.slice(0, milestoneCount));
+        if (!entries.length) return null;
+        const prizes = distribute(pool, entries.map(e => e.weight), step);
+        if (prizes.some(p => p < floor)) return null;
+        return { entries, prizes };
+    };
+
+    // Prefer the full block plus as many milestones as will clear the floor.
+    for (let count = milestones.length; count >= 0; count--) {
+        const result = attempt(true, count);
+        if (result) return result;
+    }
+    // The block cannot be funded - drop all four rather than unveil a subset.
+    for (let count = milestones.length; count >= 1; count--) {
+        const result = attempt(false, count);
+        if (result) return result;
+    }
+    return { entries: [], prizes: [] };
+}
+
 // --- board shape -----------------------------------------------------------
 
 function payoutModel(entries) {
@@ -221,9 +251,9 @@ function buildBoard(entries, entryFee) {
         specialHarvest: specialOn,
     };
 
-    const specialEntries = []
-        .concat(drawingsOn ? CONFIG.specialHarvest.drawings : [])
-        .concat(milestones);
+    const drawings = drawingsOn ? CONFIG.specialHarvest.drawings : [];
+    // Filled in below - only the prizes the board can actually fund.
+    let specialEntries = [];
 
     const { placesPerTier, decayPerTier, minWeightFraction } = CONFIG.outsideTopTen;
     const tierWeights = [];
@@ -277,13 +307,17 @@ function buildBoard(entries, entryFee) {
         specialPool = active.specialHarvest
             ? purse * shareOf('specialHarvest') + overflowFor('specialHarvest')
             : 0;
-        specialPrizes = active.specialHarvest
-            ? distributeWithFloor(
-                specialPool,
-                specialEntries.map(e => e.weight),
+        if (active.specialHarvest) {
+            const board = distributeSpecialBoard(
+                specialPool, drawings, milestones,
                 stepFor(CONFIG.specialHarvest.rounding, model),
-                floor)
-            : [];
+                floor);
+            specialEntries = board.entries;
+            specialPrizes = board.prizes;
+        } else {
+            specialEntries = [];
+            specialPrizes = [];
+        }
 
         const stillPaying = {
             topTen: true,
@@ -327,11 +361,14 @@ function buildBoard(entries, entryFee) {
             // make anyone out-earn a hunter who finished above them.
             if (refilled.overflow > 0 && specialPrizes.length) {
                 specialPool += refilled.overflow;
-                specialPrizes = distributeWithFloor(
-                    specialPool,
-                    specialEntries.map(e => e.weight),
+                // Rebuilt through the same all-or-nothing rule: a bigger pool
+                // may now afford prizes the first pass could not.
+                const rebuilt = distributeSpecialBoard(
+                    specialPool, drawings, milestones,
                     stepFor(CONFIG.specialHarvest.rounding, model),
                     floor);
+                specialEntries = rebuilt.entries;
+                specialPrizes = rebuilt.prizes;
             } else {
                 unallocated += refilled.overflow;
             }
