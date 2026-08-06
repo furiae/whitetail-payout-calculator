@@ -12,9 +12,20 @@
 
 const CONFIG = {
 
-    // Share of gross revenue paid back to hunters. 0.65 => a 35% house margin,
-    // which is what the original spec comment asked for.
+    // Share of gross revenue paid back to hunters, before the increment is
+    // applied. 0.65 => a 35% house margin, which is what the spec asked for.
+    // See marginBand below for how far this is allowed to move.
     payoutRate: 0.65,
+
+    // Every prize lands on a whole multiple of this. No $510, no $225.
+    // Caps and floors are snapped to it too, so nothing can sneak past.
+    payoutIncrement: 50,
+
+    // The house margin may sit anywhere in this band. We aim at the top of it
+    // and give back whatever the increment strands, so the flex is spent on
+    // hunters rather than kept: a rounder board costs a little margin, never
+    // the other way round.
+    marginBand: { min: 0.33, max: 0.35 },
 
     // No prize may be worth less than this many entry fees. A $100 entry means
     // nothing pays under $200.

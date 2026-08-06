@@ -46,9 +46,11 @@ function roundDownTo(value, step) {
 }
 
 // First matching rule wins; rules are listed highest-threshold first.
+// Snapped up to the increment so a config typo cannot produce an off-grid prize.
 function stepFor(rules, model) {
     const rule = rules.find(r => model >= r.minModel);
-    return rule ? rule.step : 1;
+    const step = rule ? rule.step : CONFIG.payoutIncrement;
+    return roundUpTo(step, CONFIG.payoutIncrement);
 }
 
 function ordinalRange(start, count) {
@@ -67,35 +69,35 @@ function ordinal(n) {
     }
 }
 
-// Tidy prize amounts, largest first. Prizes round down to one of these.
-const STEP_LADDER = [250, 100, 50, 25, 10, 5, 1];
+// Every prize is a whole multiple of this, so the only legal step sizes are its
+// multiples. Coarser steps make a rounder-looking board; finer steps waste less.
+const INCREMENT = CONFIG.payoutIncrement;
+const STEP_LADDER = [1000, 500, 250, 100, 50, 25, 10, 5, 1]
+    .filter(step => step % INCREMENT === 0 && step >= INCREMENT);
 
-// Always allow at least a $5 step once a board has a meaningful pool. Stranding
-// up to $5 is worth it to avoid prizes like "$66, $65, $48, $48". Below the
-// threshold $5 would be a real slice of the pool, so fall back to exact.
-const MIN_TIDY_STEP = 5;
-const TIDY_STEP_MIN_POOL = 250;
+function roundUpTo(value, step) {
+    if (!step) return Math.ceil(value);
+    return Math.ceil(value / step) * step;
+}
 
-// Whatever cannot be divided evenly stays with the house, so the step also caps
-// how far the margin can drift off target. Keep that under 1% of each pool.
-const MAX_ROUNDING_LOSS = 0.01;
+// How much of a pool a coarse step is allowed to strand before we drop to a
+// finer one. The stranded remainder is handed back to hunters afterwards, so
+// this only governs how round the board looks, not who keeps the money.
+const MAX_ROUNDING_LOSS = 0.02;
 
-// Pick the largest tidy step that (a) leaves the *smallest* prize worth at least
-// one step and (b) cannot strand more than MAX_ROUNDING_LOSS of the pool.
-// Without (a) a small field rounds every prize to zero - a single $100 entry
-// yields a $65 purse, and rounding to the nearest $50 pays 1st $50 and the rest
-// nothing. Without (b) a $250 step on a modest pool quietly pushed the margin
-// from 35% up to 44%.
+// Pick the coarsest legal step that still leaves the *smallest* prize worth at
+// least one step and does not strand more than MAX_ROUNDING_LOSS of the pool.
+// The first rule matters because otherwise a thin pool rounds every prize to
+// zero; the second keeps the board from leaning on the give-back pass.
 function chooseStep(maxStep, pool, weights) {
     const totalWeight = weights.reduce((a, b) => a + b, 0);
-    if (totalWeight <= 0 || pool <= 0) return 1;
+    if (totalWeight <= 0 || pool <= 0) return INCREMENT;
     const smallestShare = (pool * Math.min(...weights)) / totalWeight;
-    const tidyFloor = pool >= TIDY_STEP_MIN_POOL ? MIN_TIDY_STEP : 0;
-    const lossCeiling = Math.max(pool * MAX_ROUNDING_LOSS, tidyFloor);
+    const lossCeiling = Math.max(pool * MAX_ROUNDING_LOSS, INCREMENT);
     for (const step of STEP_LADDER) {
         if (step <= maxStep && smallestShare >= step && step <= lossCeiling) return step;
     }
-    return 1;
+    return INCREMENT;
 }
 
 // Hand out `pool` across `weights`, rounded down to a tidy step, then give the
@@ -205,7 +207,9 @@ function buildBoard(entries, entryFee) {
     const drawingsOn = model >= CONFIG.specialHarvest.minModel;
     const specialOn = drawingsOn || milestones.length > 0;
 
-    const floor = entryFee * CONFIG.minPayoutMultiple;
+    // Snapped UP to the increment: a $110 entry means a $220 minimum, which is
+    // not a legal prize, so the real floor is $250.
+    const floor = roundUpTo(entryFee * CONFIG.minPayoutMultiple, INCREMENT);
 
     // Which boards are unlocked by entry count. A board can also switch itself
     // off below, if its slice is too thin to fund even one prize at the floor -
@@ -331,6 +335,73 @@ function buildBoard(entries, entryFee) {
             } else {
                 unallocated += refilled.overflow;
             }
+        }
+    }
+
+    // Rounding every prize down to the increment always leaves money behind, and
+    // that money would otherwise be a silent margin increase. Spend it: hand out
+    // whole increments until the payout reaches its target, staying inside the
+    // margin band and honouring every rule already established - caps, the
+    // ordering between boards, and the descending shape within each board.
+    //
+    // Each bump goes to whichever prize sits furthest below its ideal weighted
+    // share, so giving the remainder back tightens the intended shape instead of
+    // distorting it.
+    {
+        const targetPayout = revenue * (1 - CONFIG.marginBand.max);
+        const maxPayout = revenue * (1 - CONFIG.marginBand.min);
+        const seats = placesPerTier;
+
+        const sumOf = () =>
+            topPrizes.reduce((a, b) => a + b, 0)
+            + perSeat.reduce((a, b) => a + b, 0) * seats
+            + specialPrizes.reduce((a, b) => a + b, 0);
+
+        const idealsFor = (prizes, weights, pool) => {
+            const total = weights.reduce((a, b) => a + b, 0);
+            return prizes.map((_, i) => (total > 0 ? (pool * weights[i]) / total : 0));
+        };
+        const topIdeal = idealsFor(topPrizes, CONFIG.topTen.weights.slice(0, places),
+            topPrizes.reduce((a, b) => a + b, 0));
+        const outIdeal = idealsFor(perSeat, tierWeights,
+            perSeat.reduce((a, b) => a + b, 0));
+        const specIdeal = idealsFor(specialPrizes, specialEntries.map(e => e.weight),
+            specialPrizes.reduce((a, b) => a + b, 0));
+
+        let payout = sumOf();
+        for (let guard = 0; guard < 5000 && payout < targetPayout; guard++) {
+            const paidTopNow = topPrizes.filter(v => v > 0);
+            const outsideCeiling = paidTopNow.length ? Math.min(...paidTopNow) : Infinity;
+            const candidates = [];
+
+            topPrizes.forEach((v, i) => {
+                if (v <= 0) return;
+                const cap = CONFIG.topTen.caps ? CONFIG.topTen.caps[i] : Infinity;
+                const above = i > 0 ? topPrizes[i - 1] : Infinity;
+                if (v + INCREMENT > cap || v + INCREMENT > above) return;
+                candidates.push({ cost: INCREMENT, deficit: topIdeal[i] - v,
+                    apply: () => { topPrizes[i] += INCREMENT; } });
+            });
+            perSeat.forEach((v, i) => {
+                if (v <= 0) return;
+                const above = i > 0 ? perSeat[i - 1] : Infinity;
+                if (v + INCREMENT > outsideCeiling || v + INCREMENT > above) return;
+                candidates.push({ cost: INCREMENT * seats, deficit: outIdeal[i] - v,
+                    apply: () => { perSeat[i] += INCREMENT; } });
+            });
+            specialPrizes.forEach((v, i) => {
+                if (v <= 0) return;
+                const above = i > 0 ? specialPrizes[i - 1] : Infinity;
+                if (v + INCREMENT > above) return;
+                candidates.push({ cost: INCREMENT, deficit: specIdeal[i] - v,
+                    apply: () => { specialPrizes[i] += INCREMENT; } });
+            });
+
+            const affordable = candidates.filter(c => payout + c.cost <= maxPayout);
+            if (!affordable.length) break;
+            affordable.sort((a, b) => b.deficit - a.deficit);
+            affordable[0].apply();
+            payout += affordable[0].cost;
         }
     }
 
