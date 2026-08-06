@@ -39,13 +39,18 @@ const CONFIG = {
     minPayoutMultiple: 2,
 
     // How the hunter purse is split between the three boards. These are shares
-    // of the purse and should add up to 1. If a board is not unlocked yet (say,
+    // of the purse and should add up to 1.
+    //
+    // The top ten used to take 74%, which is what the original spec asked for.
+    // It is deliberately looser now: with a hard $25,000 cap the top ten cannot
+    // absorb its old share on a full field anyway, and the money reads better
+    // spread across more finishers and bigger drawings. If a board is not unlocked yet (say,
     // there are too few entries for outside-top-10 prizes) its share is handed
     // back to the boards that ARE active, so the margin still lands on target.
     purseSplit: {
-        topTen: 0.740,
-        outsideTopTen: 0.225,
-        specialHarvest: 0.035,
+        topTen: 0.55,
+        outsideTopTen: 0.31,
+        specialHarvest: 0.14,
     },
 
     // Entries are rounded DOWN to a "payout model" before deciding how many
@@ -88,14 +93,14 @@ const CONFIG = {
     outsideTopTen: {
         // No prizes outside the top 10 until this many entries.
         minModel: 100,
-        // One extra bracket per N hunters...
-        huntersPerTier: 200,
+        // One extra bracket per N hunters. Lower means more brackets, so more
+        // hunters are paid something.
+        huntersPerTier: 50,
         // ...each bracket covering this many finishing places...
         placesPerTier: 5,
-        // ...up to this many brackets. The old code capped at 13 and silently
-        // threw away anything past it; raise this and the extra brackets now
-        // appear on the board and count against the purse properly.
-        maxTiers: 40,
+        // ...up to this many brackets. 13 brackets x 5 places = 11th through
+        // 75th, and the board never goes past 75th place.
+        maxTiers: 13,
 
         // Each bracket is worth this much less than the one above it, as a
         // fraction of the first bracket. Floored so deep brackets stay worth
@@ -120,6 +125,9 @@ const CONFIG = {
         drawings: {
             labels: ['10PT', '9PT', '8PT', '7PT'],
             weight: 3.5,
+            // Hard ceiling per point class. Money over it is shared among the
+            // milestone prizes rather than kept. Set to null to remove.
+            cap: 5000,
         },
 
         // "Lucky placing" prizes, each unlocked by its own entry threshold.

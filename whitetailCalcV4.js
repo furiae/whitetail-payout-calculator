@@ -197,8 +197,30 @@ function distributeSpecialBoard(pool, drawings, milestones, step, floor) {
         const entries = (withDrawings ? drawings : [])
             .concat(milestones.slice(0, milestoneCount));
         if (!entries.length) return null;
-        const prizes = distribute(pool, entries.map(e => e.weight), step,
-            entries.map(e => e.seats));
+        const seatList = entries.map(e => e.seats);
+        let prizes = distribute(pool, entries.map(e => e.weight), step, seatList);
+
+        // Anything over a per-entry ceiling is re-shared among the entries that
+        // do not have one, so a capped drawing makes the milestones bigger
+        // instead of handing money back to the house.
+        for (let pass = 0; pass < 4; pass++) {
+            let excess = 0;
+            prizes = prizes.map((p, i) => {
+                const cap = entries[i].cap;
+                if (typeof cap === 'number' && p > cap) {
+                    excess += (p - cap) * seatList[i];
+                    return cap;
+                }
+                return p;
+            });
+            if (excess < step) break;
+            const openWeights = entries.map((e, i) =>
+                (typeof e.cap === 'number' && prizes[i] >= e.cap) ? 0 : e.weight);
+            if (openWeights.every(w => w === 0)) break;
+            const extra = distribute(excess, openWeights, step, seatList);
+            prizes = prizes.map((p, i) => p + extra[i]);
+        }
+
         if (prizes.some(p => p < floor)) return null;
         return { entries, prizes };
     };
@@ -271,6 +293,7 @@ function buildBoard(entries, entryFee) {
         labels: CONFIG.specialHarvest.drawings.labels,
         weight: CONFIG.specialHarvest.drawings.weight,
         seats: CONFIG.specialHarvest.drawings.labels.length,
+        cap: CONFIG.specialHarvest.drawings.cap,
     }] : [];
     const milestoneUnits = milestones.map(m => ({
         labels: [m.label], weight: m.weight, seats: 1,
@@ -328,13 +351,20 @@ function buildBoard(entries, entryFee) {
         if (active.outsideTopTen) {
             const outStep = stepFor(CONFIG.outsideTopTen.rounding, model);
             let count = tiers;
-            let result = [];
-            while (true) {
-                result = distributeWithFloor(outsidePool / placesPerTier,
-                    weightsForTiers(count), outStep, floor);
-                const topBracket = result[0] || 0;
-                if (topBracket <= outsideCeilingNow || count >= CONFIG.outsideTopTen.maxTiers) break;
+            let result = distributeWithFloor(outsidePool / placesPerTier,
+                weightsForTiers(count), outStep, floor);
+            let funded = result.filter(v => v > 0).length;
+            while ((result[0] || 0) > outsideCeilingNow
+                   && count < CONFIG.outsideTopTen.maxTiers) {
+                const next = distributeWithFloor(outsidePool / placesPerTier,
+                    weightsForTiers(count + 1), outStep, floor);
+                const nextFunded = next.filter(v => v > 0).length;
+                // If an extra bracket cannot actually be funded above the floor,
+                // adding more is pointless - the pool simply is not deep enough.
+                if (nextFunded <= funded) break;
                 count++;
+                result = next;
+                funded = nextFunded;
             }
             // Still over the ceiling with every bracket allowed? Clamp, and hand
             // the difference to special harvest.
@@ -362,9 +392,13 @@ function buildBoard(entries, entryFee) {
             specialPrizes = [];
         }
 
+        // Paying 11th while 10th gets nothing makes no sense to a hunter, so the
+        // outside board only opens once every top-ten place is funded. If the
+        // top ten is short, the outside share goes back to it instead.
+        const topFullyPaid = topPrizes.filter(v => v > 0).length >= places;
         const stillPaying = {
             topTen: true,
-            outsideTopTen: perSeat.some(v => v > 0),
+            outsideTopTen: perSeat.some(v => v > 0) && topFullyPaid,
             specialHarvest: specialPrizes.some(v => v > 0),
         };
         if (stillPaying.outsideTopTen === active.outsideTopTen
@@ -447,41 +481,55 @@ function buildBoard(entries, entryFee) {
             specialPrizes.reduce((sum, p, i) => sum + p * specialEntries[i].seats, 0));
 
         let payout = sumOf();
-        for (let guard = 0; guard < 5000 && payout < targetPayout; guard++) {
+        for (let guard = 0; guard < 400 && payout < targetPayout; guard++) {
             const paidTopNow = topPrizes.filter(v => v > 0);
             const outsideCeiling = paidTopNow.length ? Math.min(...paidTopNow) : Infinity;
             const candidates = [];
 
+            // limit = the highest this prize may legally reach.
             topPrizes.forEach((v, i) => {
                 if (v <= 0) return;
                 const cap = CONFIG.topTen.caps ? CONFIG.topTen.caps[i] : Infinity;
-                const above = i > 0 ? topPrizes[i - 1] : Infinity;
-                if (v + INCREMENT > cap || v + INCREMENT > above) return;
-                candidates.push({ cost: INCREMENT, deficit: topIdeal[i] - v,
-                    apply: () => { topPrizes[i] += INCREMENT; } });
+                const limit = Math.min(cap, i > 0 ? topPrizes[i - 1] : Infinity);
+                candidates.push({ v, limit, cost: INCREMENT, deficit: topIdeal[i] - v,
+                    bump: k => { topPrizes[i] += k * INCREMENT; } });
             });
             perSeat.forEach((v, i) => {
                 if (v <= 0) return;
-                const above = i > 0 ? perSeat[i - 1] : Infinity;
-                if (v + INCREMENT > outsideCeiling || v + INCREMENT > above) return;
-                candidates.push({ cost: INCREMENT * seats, deficit: outIdeal[i] - v,
-                    apply: () => { perSeat[i] += INCREMENT; } });
+                const limit = Math.min(outsideCeiling, i > 0 ? perSeat[i - 1] : Infinity);
+                candidates.push({ v, limit, cost: INCREMENT * seats, deficit: outIdeal[i] - v,
+                    bump: k => { perSeat[i] += k * INCREMENT; } });
             });
             specialPrizes.forEach((v, i) => {
                 if (v <= 0) return;
-                const above = i > 0 ? specialPrizes[i - 1] : Infinity;
-                if (v + INCREMENT > above) return;
-                // A four-seat unit costs four increments and all four move together.
-                const unitSeats = specialEntries[i] ? specialEntries[i].seats : 1;
-                candidates.push({ cost: INCREMENT * unitSeats, deficit: specIdeal[i] - v,
-                    apply: () => { specialPrizes[i] += INCREMENT; } });
+                const unit = specialEntries[i] || {};
+                const limit = Math.min(
+                    i > 0 ? specialPrizes[i - 1] : Infinity,
+                    typeof unit.cap === 'number' ? unit.cap : Infinity);
+                const unitSeats = unit.seats || 1;
+                candidates.push({ v, limit, cost: INCREMENT * unitSeats, deficit: specIdeal[i] - v,
+                    bump: k => { specialPrizes[i] += k * INCREMENT; } });
             });
 
-            const affordable = candidates.filter(c => payout + c.cost <= maxPayout);
-            if (!affordable.length) break;
-            affordable.sort((a, b) => b.deficit - a.deficit);
-            affordable[0].apply();
-            payout += affordable[0].cost;
+            // Raise the neediest prize by as many increments as it can take in
+            // one go - one at a time is correct but needlessly slow.
+            candidates.sort((a, b) => b.deficit - a.deficit);
+            let moved = false;
+            for (const c of candidates) {
+                const headroom = Math.floor((c.limit - c.v) / INCREMENT);
+                const toTarget = Math.floor((targetPayout - payout) / c.cost);
+                const toIdeal = Math.max(1, Math.ceil(c.deficit / INCREMENT));
+                let k = Math.min(headroom, toTarget, toIdeal);
+                // Close the last sub-increment gap with one final step, which is
+                // what the margin band is there to absorb.
+                if (k < 1 && headroom >= 1 && payout + c.cost <= maxPayout) k = 1;
+                if (k < 1) continue;
+                c.bump(k);
+                payout += k * c.cost;
+                moved = true;
+                break;
+            }
+            if (!moved) break;
         }
     }
 
