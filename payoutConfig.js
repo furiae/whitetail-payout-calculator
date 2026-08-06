@@ -95,7 +95,7 @@ const CONFIG = {
         // ...up to this many brackets. The old code capped at 13 and silently
         // threw away anything past it; raise this and the extra brackets now
         // appear on the board and count against the purse properly.
-        maxTiers: 20,
+        maxTiers: 40,
 
         // Each bracket is worth this much less than the one above it, as a
         // fraction of the first bracket. Floored so deep brackets stay worth

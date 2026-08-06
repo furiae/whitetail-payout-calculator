@@ -246,7 +246,7 @@ function buildBoard(entries, entryFee) {
     const model = payoutModel(entries);
 
     const places = topPlacesPaid(model);
-    const tiers = outsideTierCount(model);
+    let tiers = outsideTierCount(model);
     const milestones = unlockedMilestones(model);
     const drawingsOn = model >= CONFIG.specialHarvest.minModel;
     const specialOn = drawingsOn || milestones.length > 0;
@@ -279,10 +279,14 @@ function buildBoard(entries, entryFee) {
     let specialEntries = [];
 
     const { placesPerTier, decayPerTier, minWeightFraction } = CONFIG.outsideTopTen;
-    const tierWeights = [];
-    for (let i = 0; i < tiers; i++) {
-        tierWeights.push(Math.max(1 - i * decayPerTier, minWeightFraction));
-    }
+    const weightsForTiers = count => {
+        const out = [];
+        for (let i = 0; i < count; i++) {
+            out.push(Math.max(1 - i * decayPerTier, minWeightFraction));
+        }
+        return out;
+    };
+    let tierWeights = weightsForTiers(tiers);
 
     let topPrizes = [];
     let perSeat = [];
@@ -308,27 +312,43 @@ function buildBoard(entries, entryFee) {
         const capped = applyCaps(uncapped, CONFIG.topTen.caps, topStep);
         topPrizes = capped.prizes;
 
-        // Money the top ten could not hold is shared between the other boards in
-        // proportion to their normal split, so the caps make those prizes bigger
-        // rather than making the house richer.
-        const otherShare = shareOf('outsideTopTen') + shareOf('specialHarvest');
-        const overflowFor = key => (otherShare > 0
-            ? capped.overflow * (shareOf(key) / otherShare)
-            : 0);
-        unallocated = otherShare > 0 ? 0 : capped.overflow;
+        // Money the top ten could not hold goes to the other boards rather than
+        // to the house. The placings get first call on it: paying more hunters
+        // who actually finished beats inflating a handful of drawings.
+        //
+        // No outside bracket may pass the smallest top-ten prize, so once the
+        // brackets are all at that ceiling the only way to absorb more is to pay
+        // DEEPER - so the board grows brackets until the money fits or it runs
+        // out of room. Whatever is still left goes to special harvest.
+        const outsideCeilingNow = Math.min(...topPrizes.filter(v => v > 0));
+        const outsideBase = purse * shareOf('outsideTopTen');
+        let outsidePool = active.outsideTopTen ? outsideBase + capped.overflow : 0;
+        let leftForSpecial = active.outsideTopTen ? 0 : capped.overflow;
 
-        // Every bracket pays `placesPerTier` hunters the same amount, so share
-        // out a per-seat pool and let each bracket cost placesPerTier x that.
-        perSeat = active.outsideTopTen
-            ? distributeWithFloor(
-                (purse * shareOf('outsideTopTen') + overflowFor('outsideTopTen')) / placesPerTier,
-                tierWeights,
-                stepFor(CONFIG.outsideTopTen.rounding, model),
-                floor)
-            : [];
-
+        if (active.outsideTopTen) {
+            const outStep = stepFor(CONFIG.outsideTopTen.rounding, model);
+            let count = tiers;
+            let result = [];
+            while (true) {
+                result = distributeWithFloor(outsidePool / placesPerTier,
+                    weightsForTiers(count), outStep, floor);
+                const topBracket = result[0] || 0;
+                if (topBracket <= outsideCeilingNow || count >= CONFIG.outsideTopTen.maxTiers) break;
+                count++;
+            }
+            // Still over the ceiling with every bracket allowed? Clamp, and hand
+            // the difference to special harvest.
+            const clamped = result.map(v => Math.min(v, outsideCeilingNow));
+            leftForSpecial = (result.reduce((a, b) => a + b, 0)
+                - clamped.reduce((a, b) => a + b, 0)) * placesPerTier;
+            perSeat = clamped;
+            tiers = count;
+            tierWeights = weightsForTiers(count);
+        } else {
+            perSeat = [];
+        }
         specialPool = active.specialHarvest
-            ? purse * shareOf('specialHarvest') + overflowFor('specialHarvest')
+            ? purse * shareOf('specialHarvest') + leftForSpecial
             : 0;
         if (active.specialHarvest) {
             const board = distributeSpecialBoard(
@@ -392,8 +412,6 @@ function buildBoard(entries, entryFee) {
                     floor);
                 specialEntries = rebuilt.entries;
                 specialPrizes = rebuilt.prizes;
-            } else {
-                unallocated += refilled.overflow;
             }
         }
     }
@@ -496,6 +514,11 @@ function buildBoard(entries, entryFee) {
     const allRows = [...topRows, ...outsideRows, ...specialRows];
     const hunterPayout = allRows.reduce((sum, r) => sum + r.amount * r.seats, 0);
     const grossMargin = revenue - hunterPayout;
+
+    // Purse money the board could not place anywhere, measured against what was
+    // actually paid rather than guessed at part-way through - the give-back pass
+    // usually finds a home for it, so anything counted earlier is provisional.
+    unallocated = Math.max(0, purse - hunterPayout);
 
     return {
         entries, entryFee, model, revenue, hunterPayout, grossMargin,
