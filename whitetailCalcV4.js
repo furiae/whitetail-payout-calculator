@@ -528,8 +528,9 @@ function readPositiveInt(input) {
     return Math.floor(parsed);
 }
 
+// Defaults: the field sells out at 2,500 and the entry is $225.
 let hEntries = 2500;
-let entryFee = 100;
+let entryFee = 225;
 
 // Both forms behave identically: re-read BOTH fields, validate, recalculate.
 // Reading both matters because a user can type a new entry fee and then press
