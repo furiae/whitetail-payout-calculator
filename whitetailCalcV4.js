@@ -120,6 +120,22 @@ function distribute(pool, weights, maxStep) {
     return prizes;
 }
 
+// Share out a pool, but never award a prize below `floor`. Prizes are dropped
+// from the bottom up - each drop makes the survivors bigger, so this converges -
+// and the whole pool is still handed out, which is what keeps the margin on
+// target. Returns an array the same length as `weights`, zero-padded for the
+// prizes that were dropped.
+function distributeWithFloor(pool, weights, maxStep, floor) {
+    for (let count = weights.length; count >= 1; count--) {
+        const prizes = distribute(pool, weights.slice(0, count), maxStep);
+        if (prizes[count - 1] >= floor) {
+            return prizes.concat(new Array(weights.length - count).fill(0));
+        }
+    }
+    // Not even one prize clears the floor - this board cannot pay yet.
+    return weights.map(() => 0);
+}
+
 // --- board shape -----------------------------------------------------------
 
 function payoutModel(entries) {
@@ -155,62 +171,96 @@ function buildBoard(entries, entryFee) {
     const drawingsOn = model >= CONFIG.specialHarvest.minModel;
     const specialOn = drawingsOn || milestones.length > 0;
 
-    // Renormalise the split over whichever boards actually have prizes, so an
-    // unlocked-later board never quietly costs the hunters money.
+    const floor = entryFee * CONFIG.minPayoutMultiple;
+
+    // Which boards are unlocked by entry count. A board can also switch itself
+    // off below, if its slice is too thin to fund even one prize at the floor -
+    // in which case its money goes back to the boards that can pay, so we
+    // recompute until the set of paying boards settles.
     const active = {
         topTen: true,
         outsideTopTen: tiers > 0,
         specialHarvest: specialOn,
     };
-    const activeTotal = Object.keys(active)
-        .filter(k => active[k])
-        .reduce((sum, k) => sum + CONFIG.purseSplit[k], 0);
-    const shareOf = key => (active[key] ? CONFIG.purseSplit[key] / activeTotal : 0);
 
-    // Top ten
-    const topWeights = CONFIG.topTen.weights.slice(0, places);
-    const topPrizes = distribute(purse * shareOf('topTen'), topWeights,
-        stepFor(CONFIG.topTen.rounding, model));
-    const topRows = topPrizes.map((amount, i) => ({ label: ordinal(i + 1), amount, seats: 1 }));
+    const specialEntries = []
+        .concat(drawingsOn ? CONFIG.specialHarvest.drawings : [])
+        .concat(milestones);
 
-    // Outside the top ten
-    const outsideRows = [];
-    if (tiers > 0) {
-        const { placesPerTier, decayPerTier, minWeightFraction } = CONFIG.outsideTopTen;
-        const weights = [];
-        for (let i = 0; i < tiers; i++) {
-            weights.push(Math.max(1 - i * decayPerTier, minWeightFraction));
-        }
+    const { placesPerTier, decayPerTier, minWeightFraction } = CONFIG.outsideTopTen;
+    const tierWeights = [];
+    for (let i = 0; i < tiers; i++) {
+        tierWeights.push(Math.max(1 - i * decayPerTier, minWeightFraction));
+    }
+
+    let topPrizes = [];
+    let perSeat = [];
+    let specialPrizes = [];
+
+    for (let pass = 0; pass < 4; pass++) {
+        const activeTotal = Object.keys(active)
+            .filter(k => active[k])
+            .reduce((sum, k) => sum + CONFIG.purseSplit[k], 0);
+        const shareOf = key => (active[key] && activeTotal > 0
+            ? CONFIG.purseSplit[key] / activeTotal
+            : 0);
+
+        topPrizes = distributeWithFloor(
+            purse * shareOf('topTen'),
+            CONFIG.topTen.weights.slice(0, places),
+            stepFor(CONFIG.topTen.rounding, model),
+            floor);
+
         // Every bracket pays `placesPerTier` hunters the same amount, so share
         // out a per-seat pool and let each bracket cost placesPerTier x that.
-        const perSeatPool = (purse * shareOf('outsideTopTen')) / placesPerTier;
-        const perSeat = distribute(perSeatPool, weights,
-            stepFor(CONFIG.outsideTopTen.rounding, model));
+        perSeat = active.outsideTopTen
+            ? distributeWithFloor(
+                (purse * shareOf('outsideTopTen')) / placesPerTier,
+                tierWeights,
+                stepFor(CONFIG.outsideTopTen.rounding, model),
+                floor)
+            : [];
 
-        let start = CONFIG.topTen.maxPlaces + 1;
-        for (let i = 0; i < tiers; i++) {
+        specialPrizes = active.specialHarvest
+            ? distributeWithFloor(
+                purse * shareOf('specialHarvest'),
+                specialEntries.map(e => e.weight),
+                stepFor(CONFIG.specialHarvest.rounding, model),
+                floor)
+            : [];
+
+        const stillPaying = {
+            topTen: true,
+            outsideTopTen: perSeat.some(v => v > 0),
+            specialHarvest: specialPrizes.some(v => v > 0),
+        };
+        if (stillPaying.outsideTopTen === active.outsideTopTen
+            && stillPaying.specialHarvest === active.specialHarvest) break;
+        active.outsideTopTen = active.outsideTopTen && stillPaying.outsideTopTen;
+        active.specialHarvest = active.specialHarvest && stillPaying.specialHarvest;
+    }
+
+    // Dropped prizes are omitted from the board entirely rather than shown as $0.
+    const topRows = topPrizes
+        .map((amount, i) => ({ label: ordinal(i + 1), amount, seats: 1 }))
+        .filter(r => r.amount > 0);
+
+    const outsideRows = [];
+    let start = CONFIG.topTen.maxPlaces + 1;
+    for (let i = 0; i < perSeat.length; i++) {
+        if (perSeat[i] > 0) {
             outsideRows.push({
                 label: ordinalRange(start, placesPerTier),
                 amount: perSeat[i],
                 seats: placesPerTier,
             });
-            start += placesPerTier;
         }
+        start += placesPerTier;
     }
 
-    // Special harvest
-    const specialRows = [];
-    if (specialOn) {
-        const entriesList = []
-            .concat(drawingsOn ? CONFIG.specialHarvest.drawings : [])
-            .concat(milestones);
-        const prizes = distribute(purse * shareOf('specialHarvest'),
-            entriesList.map(e => e.weight),
-            stepFor(CONFIG.specialHarvest.rounding, model));
-        entriesList.forEach((e, i) => {
-            specialRows.push({ label: e.label, amount: prizes[i], seats: 1 });
-        });
-    }
+    const specialRows = specialEntries
+        .map((e, i) => ({ label: e.label, amount: specialPrizes[i] || 0, seats: 1 }))
+        .filter(r => r.amount > 0);
 
     const allRows = [...topRows, ...outsideRows, ...specialRows];
     const hunterPayout = allRows.reduce((sum, r) => sum + r.amount * r.seats, 0);

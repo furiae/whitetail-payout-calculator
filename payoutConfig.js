@@ -16,6 +16,17 @@ const CONFIG = {
     // which is what the original spec comment asked for.
     payoutRate: 0.65,
 
+    // No prize may be worth less than this many entry fees. A $100 entry means
+    // nothing pays under $200.
+    //
+    // A prize that cannot reach the floor is REMOVED, not topped up, and its
+    // money is shared out among the prizes that remain. Topping up would mean
+    // inventing money the purse does not have, which is exactly how the old
+    // version ended up paying out more than it collected on small fields.
+    // So a thin field pays fewer, bigger prizes rather than a long list of
+    // token ones.
+    minPayoutMultiple: 2,
+
     // How the hunter purse is split between the three boards. These are shares
     // of the purse and should add up to 1. If a board is not unlocked yet (say,
     // there are too few entries for outside-top-10 prizes) its share is handed
