@@ -230,6 +230,7 @@ function buildBoard(entries, entryFee) {
     let topPrizes = [];
     let perSeat = [];
     let specialPrizes = [];
+    let specialPool = 0;
     // Capped money with nowhere to go, because no other board has unlocked yet.
     let unallocated = 0;
 
@@ -269,9 +270,12 @@ function buildBoard(entries, entryFee) {
                 floor)
             : [];
 
+        specialPool = active.specialHarvest
+            ? purse * shareOf('specialHarvest') + overflowFor('specialHarvest')
+            : 0;
         specialPrizes = active.specialHarvest
             ? distributeWithFloor(
-                purse * shareOf('specialHarvest') + overflowFor('specialHarvest'),
+                specialPool,
                 specialEntries.map(e => e.weight),
                 stepFor(CONFIG.specialHarvest.rounding, model),
                 floor)
@@ -286,6 +290,48 @@ function buildBoard(entries, entryFee) {
             && stillPaying.specialHarvest === active.specialHarvest) break;
         active.outsideTopTen = active.outsideTopTen && stillPaying.outsideTopTen;
         active.specialHarvest = active.specialHarvest && stillPaying.specialHarvest;
+    }
+
+    // Finishing higher must always pay more. The outside-top-10 brackets are a
+    // placing board just like the top ten, so no bracket may beat the smallest
+    // top-ten prize - otherwise 11th out-earns 10th, which happens whenever the
+    // outside board unlocks onto a single bracket holding its whole share.
+    // Anything trimmed goes back to the top ten, up to the caps.
+    const paidTop = topPrizes.filter(v => v > 0);
+    if (paidTop.length && perSeat.length) {
+        const ceiling = Math.min(...paidTop);
+        const seats = placesPerTier;
+        let reclaimed = 0;
+        perSeat = perSeat.map(amount => {
+            if (amount > ceiling) {
+                reclaimed += (amount - ceiling) * seats;
+                return ceiling;
+            }
+            return amount;
+        });
+
+        if (reclaimed > 0) {
+            const topStep = stepFor(CONFIG.topTen.rounding, model);
+            const refilled = applyCaps(
+                topPrizes.map((v, i) => v + (i === 0 ? reclaimed : 0)),
+                CONFIG.topTen.caps,
+                topStep);
+            topPrizes = refilled.prizes;
+
+            // Whatever the top ten still cannot hold goes to special harvest.
+            // Those are drawings, not finishing places, so growing them cannot
+            // make anyone out-earn a hunter who finished above them.
+            if (refilled.overflow > 0 && specialPrizes.length) {
+                specialPool += refilled.overflow;
+                specialPrizes = distributeWithFloor(
+                    specialPool,
+                    specialEntries.map(e => e.weight),
+                    stepFor(CONFIG.specialHarvest.rounding, model),
+                    floor);
+            } else {
+                unallocated += refilled.overflow;
+            }
+        }
     }
 
     // Dropped prizes are omitted from the board entirely rather than shown as $0.
