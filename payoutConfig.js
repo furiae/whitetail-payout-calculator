@@ -70,12 +70,12 @@ const CONFIG = {
         // Relative size of each place. Only the ratios matter - they are
         // normalised against however many places are actually paying.
         //
-        // These used to copy the old live board, whose 6th-10th were only 14%
-        // apart (1.6 down to 1.4). That tail was flat enough that on a small
-        // field all five rounded to the same number - 6th through 10th every
-        // one of them $500. The tail is now properly graded: 6th pays about
-        // 1.9x what 10th pays, so the places stay distinct at any field size.
-        weights: [6, 5, 4, 3.2, 2.4, 1.9, 1.6, 1.35, 1.15, 1.0],
+        // A smooth curve from 1st to 10th at a 3:1 ratio - each place is worth
+        // about 11% more than the one below it. Earlier versions copied the old
+        // live board and were far steeper (6:1), which made the gaps at the top
+        // feel brutal, and had a flat 6th-10th tail that rounded to a single
+        // number on small fields.
+        weights: [3.0, 2.658, 2.354, 2.085, 1.847, 1.636, 1.449, 1.284, 1.137, 1.0],
 
         // Hard ceiling per place, in dollars. Once a big field pushes a place
         // past its cap the extra does NOT stay with the house: it first tops up
@@ -83,8 +83,14 @@ const CONFIG = {
         // into the outside-top-10 and special harvest boards. The margin is
         // unchanged either way - the money just lands somewhere better.
         //
+        // The ladder used to fall $2,500 a step to $2,500 at 10th, which meant
+        // 9th paid double 10th and, on a full field, the ten caps could only
+        // hold $137,500 of a $365,625 purse - the surplus had to pile up on the
+        // milestone prizes. It now eases from $25,000 to $10,000, so the board
+        // reads evenly AND holds $165,000.
+        //
         // Set to null to remove the ceilings entirely.
-        caps: [25000, 22500, 20000, 17500, 15000, 12500, 10000, 7500, 5000, 2500],
+        caps: [25000, 22500, 20500, 18500, 16500, 15000, 13500, 12500, 11000, 10000],
 
         // Round each prize down to a tidy number. First matching rule wins.
         // A step wider than the gap between two places merges them, so the
