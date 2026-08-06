@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Apex Whitetail Payout Calculator</title>
     <link rel="stylesheet" href="turkeyCalcV2.css">
@@ -12,237 +11,94 @@
     Payout Calculator</h1>
 
     <div class="payout-info-container">
-    <div class="payout-info">
-        <table id="payout-nums">
-            <thead>
-                <tr>
-                    <th>Hunter Entries</th>
-                    <th>Payout Model</th>
-                </tr>
-                <tr>
-                    <td>2,500</td>
-                    <td>2,500</td>
-                <tr>
-                    <th>Gross Revenue</th>
-                    <th>Hunter Payout</th>
-                </tr>
-                <tr>
-                    <td>$250,000</td>
-                    <td>$155,250</td>
-                </tr>
-            </thead>
-        </table>
+        <div class="payout-info">
+            <table id="payout-nums">
+                <thead>
+                    <tr>
+                        <th>Hunter Entries</th>
+                        <th>Payout Model</th>
+                    </tr>
+                    <tr>
+                        <td>2,500</td>
+                        <td>2,500</td>
+                    </tr>
+                    <tr>
+                        <th>Gross Revenue</th>
+                        <th>Hunter Payout</th>
+                    </tr>
+                    <tr>
+                        <td>$250,000</td>
+                        <td>$162,500</td>
+                    </tr>
+                </thead>
+            </table>
 
-
-    <h3>Gross Margin</h3>
-        <h4 id="gross-margin">$94,750 (38%)</h4>
+            <h3>Gross Margin</h3>
+            <h4 id="gross-margin">$87,500 (35%)</h4>
+        </div>
     </div>
-</div>
 
-    <form id="hunter-entries" action="submit">
-        <label for="hunter-entries-input">HUNTER ENTRIES</label>
-        <input type="text" inputmode="numeric" placeholder="2500" id="hunter-entries-input">
-        <button>Submit</button>
-    </form>
+    <div class="controls">
+        <form id="hunter-entries" action="submit">
+            <label for="hunter-entries-input">HUNTER ENTRIES</label>
+            <input type="text" inputmode="numeric" placeholder="2500" id="hunter-entries-input">
+            <button>Submit</button>
+        </form>
 
-    <form id="entry-fee" action="submit">
-        <label for="entry-fee-input">ENTRY FEE</label>
-        <input type="text" inputmode="numeric" placeholder="100" id="entry-fee-input">
-        <button>Submit</button>
-    </form>
+        <form id="entry-fee" action="submit">
+            <label for="entry-fee-input">ENTRY FEE</label>
+            <input type="text" inputmode="numeric" placeholder="100" id="entry-fee-input">
+            <button>Submit</button>
+        </form>
+    </div>
 
     <p id="input-error" class="input-error" role="status" aria-live="polite"></p>
 
     <div class="row-container">
-    <div id="row">
-        <div class="leaderboard">
-        <p class="leaderboard-heading">TOP TEN</p>
-    <table class="leaderboard-table" id="top-ten">
-        <thead>
-            <tr>
-                <th>Place</th>
-                <th>Payout</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>1st</td>
-                <td>$5,000</td>
-            </tr>
-            <tr>
-                <td>2nd</td>
-                <td>$5,000</td>
-            </tr>
-            <tr>
-                <td>3rd</td>
-                <td>$5,000</td>
-            </tr>
-            <tr>
-                <td>4th</td>
-                <td>$5,000</td>
-            </tr>
-            <tr>
-                <td>5th</td>
-                <td>$5,000</td>
-            </tr>
-            <tr>
-                <td>6th</td>
-                <td>$3,750</td>
-            </tr>
-            <tr>
-                <td>7th</td>
-                <td>$3,750</td>
-            </tr>
-            <tr>
-                <td>8th</td>
-                <td>$3,750</td>
-            </tr>
-            <tr>
-                <td>9th</td>
-                <td>$3,750</td>
-            </tr>
-            <tr>
-                <td>10th</td>
-                <td>$3,750</td>
-            </tr>
-        </tbody>
-    </table>
+        <div id="row">
+            <div class="leaderboard">
+                <p class="leaderboard-heading">TOP TEN</p>
+                <table class="leaderboard-table" id="top-ten">
+                    <thead>
+                        <tr>
+                            <th>Place</th>
+                            <th>Payout</th>
+                        </tr>
+                    </thead>
+                    <!-- Rows are rendered by whitetailCalcV4.js -->
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="leaderboard">
+                <p class="leaderboard-heading">OUTSIDE TOP 10</p>
+                <table class="leaderboard-table" id="outside-top-ten">
+                    <thead>
+                        <tr>
+                            <th>Place</th>
+                            <th>Payout</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="leaderboard">
+                <p class="leaderboard-heading">SPECIAL HARVEST</p>
+                <table class="leaderboard-table" id="special-harvest">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Payout</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <div class="leaderboard">
-        <p class="leaderboard-heading">Outside Top 10</p>
-    <table class="leaderboard-table" id="outside-top-ten">
-        <thead>
-            <tr>
-                <th>Place</th>
-                <th>Payout</th>
-            </tr>
-        </thead>    
-        <tbody>    
-            <tr id="11th-15th">
-                <td>11th-15th</td>
-                <td>$1,000</td>
-            </tr>
-            <tr id="16th-20th">
-                <td>16th-20th</td>
-                <td>$1,000</td>
-            </tr>
-            <tr id="21st-25th">
-                <td>21st-25th</td>
-                <td>$1,000</td>
-            </tr>
-            <tr id="26th-30th">
-                <td>26th-30th</td>
-                <td>$1,000</td>
-            </tr>
-            <tr id="31st-35th">
-                <td>31st-35th</td>
-                <td>$500</td>
-            </tr>
-            <tr id="36th-40th">
-                <td>36th-40th</td>
-                <td>$500</td>
-            </tr>
-            <tr id="41st-45th">
-                <td>41st-45th</td>
-                <td>$500</td>
-            </tr>
-            <tr id="46th-50th">
-                <td>46th-50th</td>
-                <td>$500</td>
-            </tr>
-            <tr id="51st-55th">
-                <td>51st-55th</td>
-                <td>$500</td>
-            </tr>
-            <tr id="56th-60th">
-                <td>56th-60th</td>
-                <td>$500</td>
-            </tr>
-            <tr id="61st-65th">
-                <td>61st-65th</td>
-                <td>$500</td>
-            </tr>
-            <tr id="66th-70th">
-                <td>66th-70th</td>
-                <td>$500</td>
-            </tr>
-            <tr id="71st-75th">
-                <td>71st-75th</td>
-                <td>$0</td>
-            </tr>
-        </tbody>
-    </table>
-    </div>
-    
-    <div class="leaderboard">
-        <p class="leaderboard-heading">SPECIAL HARVEST</p>
-    
-
-    <table class="leaderboard-table" id="special-harvest">
-        <thead>
-            <!-- <tr>
-                <td><div>SPECIAL HARVEST</div></td>
-            </tr> -->
-            <tr>
-                <th>Category</th>
-                <th>Payout</th>
-            </tr>
-        </thead>
-            <tbody>
-            <tr>
-                <td>10PT</td>
-                <td>$3000</td>
-            </tr>
-            <tr>
-                <td>9PT</td>
-                <td>$3000</td>
-            </tr>
-            <tr>
-                <td>8PT</td>
-                <td>$2000</td>
-            </tr>
-            <tr>
-                <td>7PT</td>
-                <td>$2000</td>
-            </tr>
-            <tr>
-                <td>100th</td>
-                <td>$3000</td>
-            </tr>
-            <tr>
-                <td>200th</td>
-                <td>$3000</td>
-            </tr>
-            <tr>
-                <td>300th</td>
-                <td>$1500</td>
-            </tr>
-            <tr>
-                <td>400th</td>
-                <td>$1500</td>
-            </tr>
-            <tr>
-                <td>500th</td>
-                <td>$500</td>
-            </tr>
-            <tr>
-                <td>750th</td>
-                <td>$0</td>
-            </tr>
-            <tr>
-                <td>1000th</td>
-                <td>$0</td>
-            </tr>
-            <tr>
-                <td>1250th</td>
-                <td>$0</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-</div>
-</div>
+    <script src="payoutConfig.js"></script>
     <script src="whitetailCalcV4.js"></script>
 </body>
 </html>

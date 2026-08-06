@@ -1,0 +1,113 @@
+// ---------------------------------------------------------------------------
+// APEX Whitetail Challenge - payout configuration
+//
+// Everything you are likely to want to change lives in this file. The maths in
+// whitetailCalcV4.js reads these numbers and does not hardcode any of them.
+//
+// The model is "purse first": we take a fixed share of gross revenue, then hand
+// it out by weight. That is what keeps the house margin steady no matter how
+// many hunters enter - the old version calculated each prize on its own and let
+// the total land wherever it happened to land (anywhere from 26% to 65%).
+// ---------------------------------------------------------------------------
+
+const CONFIG = {
+
+    // Share of gross revenue paid back to hunters. 0.65 => a 35% house margin,
+    // which is what the original spec comment asked for.
+    payoutRate: 0.65,
+
+    // How the hunter purse is split between the three boards. These are shares
+    // of the purse and should add up to 1. If a board is not unlocked yet (say,
+    // there are too few entries for outside-top-10 prizes) its share is handed
+    // back to the boards that ARE active, so the margin still lands on target.
+    purseSplit: {
+        topTen: 0.740,
+        outsideTopTen: 0.225,
+        specialHarvest: 0.035,
+    },
+
+    // Entries are rounded DOWN to a "payout model" before deciding how many
+    // places pay. This is deliberately conservative - it protects against
+    // no-shows. It no longer affects the size of the purse, only its shape.
+    model: {
+        roundToBelow400: 10,
+        roundToFrom400: 50,
+    },
+
+    topTen: {
+        // One paid place per N hunters, clamped to [minPlaces, maxPlaces].
+        huntersPerPlace: 10,
+        minPlaces: 3,
+        maxPlaces: 10,
+
+        // Relative size of each place. Only the ratios matter - they are
+        // normalised against however many places are actually paying. These
+        // reproduce the shape of the current live board (1st is a bit over 4x
+        // 10th), so the prize list still "feels" the same.
+        weights: [6, 5, 4, 3.5, 2, 1.6, 1.55, 1.5, 1.45, 1.4],
+
+        // Round each prize down to a tidy number. First matching rule wins.
+        rounding: [
+            { minModel: 350, step: 250 },
+            { minModel: 100, step: 100 },
+            { minModel: 0, step: 50 },
+        ],
+    },
+
+    outsideTopTen: {
+        // No prizes outside the top 10 until this many entries.
+        minModel: 100,
+        // One extra bracket per N hunters...
+        huntersPerTier: 200,
+        // ...each bracket covering this many finishing places...
+        placesPerTier: 5,
+        // ...up to this many brackets. The old code capped at 13 and silently
+        // threw away anything past it; raise this and the extra brackets now
+        // appear on the board and count against the purse properly.
+        maxTiers: 20,
+
+        // Each bracket is worth this much less than the one above it, as a
+        // fraction of the first bracket. Floored so deep brackets stay worth
+        // showing up for.
+        decayPerTier: 0.08,
+        minWeightFraction: 0.25,
+
+        rounding: [
+            { minModel: 350, step: 100 },
+            { minModel: 0, step: 50 },
+        ],
+    },
+
+    specialHarvest: {
+        // The spec always said 20 entries; the code had drifted to 40.
+        minModel: 20,
+
+        // Point-class drawings. Weights are relative, same as everywhere else.
+        drawings: [
+            { label: '10PT', weight: 4 },
+            { label: '9PT', weight: 4 },
+            { label: '8PT', weight: 3 },
+            { label: '7PT', weight: 3 },
+        ],
+
+        // "Lucky placing" prizes, each unlocked by its own entry threshold.
+        milestones: [
+            { label: '100th', minModel: 300, weight: 2 },
+            { label: '200th', minModel: 500, weight: 2 },
+            { label: '300th', minModel: 800, weight: 0.6 },
+            { label: '400th', minModel: 1000, weight: 0.6 },
+            { label: '500th', minModel: 1200, weight: 0.6 },
+            { label: '750th', minModel: 1750, weight: 0.6 },
+            { label: '1000th', minModel: 2000, weight: 0.6 },
+            { label: '1250th', minModel: 2500, weight: 0.6 },
+        ],
+
+        rounding: [
+            { minModel: 200, step: 250 },
+            { minModel: 0, step: 100 },
+        ],
+    },
+};
+
+// Exported for the Node test harness; ignored by the browser.
+if (typeof module !== 'undefined') module.exports = { CONFIG };

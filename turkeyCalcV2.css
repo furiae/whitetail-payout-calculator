@@ -1,202 +1,260 @@
-body {
-    margin-bottom: 100px;
-    /* width: 100%; */
-    background-color: rgba(0, 0, 0, 0);
+/* ---------------------------------------------------------------------------
+   APEX Whitetail Challenge - payout calculator
+
+   The page background is left transparent on purpose: this page is embedded in
+   another site, so the host page supplies the backdrop. Everything here styles
+   the panels, which are dark with light text so they read well on either a
+   light or a dark host page.
+   --------------------------------------------------------------------------- */
+
+:root {
+    --panel: #23282a;
+    --panel-edge: #3a4145;
+    --panel-alt: #2b3134;
+    --ink: #f2efe9;
+    --ink-dim: #a9b0b3;
+    --accent: #c8922f;
+    --accent-soft: rgba(200, 146, 47, 0.14);
+    --good: #7fb069;
+    --bad: #d9534f;
+    --radius: 14px;
 }
 
-table{
-    margin: auto;
-    margin-top: 0px;
-    letter-spacing: .2em;
+body {
+    margin: 0 0 100px;
+    background-color: transparent;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    -webkit-text-size-adjust: 100%;
 }
 
 h1 {
     text-align: center;
-    /* Was a flat 5em (80px), which overflowed narrow screens. */
-    font-size: clamp(2rem, 7vw, 5rem);
-    /* margin: 50px 0px 25px; */
+    font-size: clamp(1.9rem, 6vw, 4rem);
+    line-height: 1.1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin: 0.6em 0.4em 0.5em;
+    color: var(--ink);
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
 }
 
-h2{
-    font-size: 3em;
+/* --- summary panel -------------------------------------------------------- */
+
+.payout-info-container {
+    display: flex;
+    justify-content: center;
+    padding: 0 1rem;
+}
+
+.payout-info {
+    width: 100%;
+    /* Was min-width: 1250px, which shoved this panel off the left edge of any
+       narrower screen with no way to scroll it back into view. */
+    max-width: 1100px;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: var(--radius);
+    padding: 1.5rem 1rem 1.75rem;
     text-align: center;
-    text-decoration: underline;
+    overflow-x: auto;
+}
+
+#payout-nums {
+    margin: 0 auto;
+    border-collapse: collapse;
+}
+
+#payout-nums th {
+    font-size: clamp(0.7rem, 1.6vw, 0.85rem);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-dim);
+    padding: 0.9rem 1.75rem 0.2rem;
+}
+
+#payout-nums td {
+    font-size: clamp(1.1rem, 3.2vw, 1.9rem);
+    font-weight: 600;
+    padding: 0 1.75rem 0.4rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.payout-info h3 {
+    font-size: clamp(0.75rem, 1.8vw, 0.95rem);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-dim);
+    margin: 1.4rem 0 0.3rem;
+}
+
+.payout-info h4 {
+    font-size: clamp(1.6rem, 5vw, 2.6rem);
+    font-weight: 700;
+    color: var(--good);
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A payout larger than revenue is a loss - never show it in the "profit" green. */
+.negative {
+    color: var(--bad);
+}
+
+/* --- inputs --------------------------------------------------------------- */
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 2.5rem;
+    margin: 2rem 1rem 0;
 }
 
 form {
     display: flex;
-    justify-content: center;
     align-items: center;
     flex-wrap: wrap;
-    margin: 0 0 0 0;
+    justify-content: center;
+    gap: 0.75rem;
 }
 
 label {
-    font-size: clamp(1.25rem, 4vw, 2.5rem);
-    margin: 20px;
-    font-weight: 500;
+    font-size: clamp(0.75rem, 2vw, 0.95rem);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-dim);
 }
 
 input {
-    height: 100%;
-    font-size: 2em;
-    max-width: 150px;
-    padding: 5px;
-    margin: 20px;
-    border-radius: 15px;
+    font-size: clamp(1rem, 3vw, 1.35rem);
+    font-weight: 600;
+    width: 7.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid var(--panel-edge);
+    background: var(--panel-alt);
+    color: var(--ink);
     text-align: center;
+    font-variant-numeric: tabular-nums;
 }
 
-th:nth-child(1){
-    font-size: 1em;
-    text-align: left;
-    padding: 5px;
+input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
-th:nth-child(2){
-    font-size: 1em;
-    text-align: right;
-    padding: 5px;
-}
-
-td{
-    text-align: center;
-    padding: 5px;
-    margin: 5px;
-}
-
-#payout-nums th {
-    padding-left: 1em;
-    padding-right: 1em;
-    font-size: 1.25em;
-}
-
-/* The summary table is the widest thing on the page; let it scroll inside its
-   own panel rather than pushing the whole document sideways. */
-.payout-info {
-    overflow-x: auto;
-}
-
-#payout-nums td {
-    font-size: 1.25em;
-}
-
-h3{
-    text-align: center;
-    font-size: 2em !important;
-    margin: .25em;
-    letter-spacing: .2em;
-}
-h4{
-    text-align: center;
-    font-size: clamp(1.4rem, 5vw, 2.5rem);
-    color: green;
-    /* color: #ff0000; */
-    margin: .25em;
-    letter-spacing: .2em;
-}
-
-
-.negative{
-    text-align: center;
-    font-size: 2em;
-    color: red;
-    margin: .25em;
-    letter-spacing: .2em;
-}
-
-tbody td:nth-child(1){
-    text-align: left;
-    padding-right: 15px;
-}
-
-tbody td:nth-child(2){
-    text-align: right;
-    padding-left: 15px;
-}
-
-
-tr {
-    font-size: 1.5em;
-}
-
-h3 {
-    font-size: clamp(1.4rem, 5vw, 2.5rem) !important;
-}
-
-.row-container {
-    display:flex;
-    justify-content: center;
-}
-
-#row {
-    width: 100%;
-    max-width: 1250px;
-    display: flex;
-    /* Wrap instead of overflowing: three 400px cards do not fit a phone or a
-       narrow embed column. */
-    flex-wrap: wrap;
-    margin: 20px auto 80px;
-    justify-content: center;
-}
-
-.leaderboard {
-    flex: 1 1 320px;
-    min-width: 0;
-    max-width: 500px;
-    background-color: rgba(128, 128, 128, 0.69);
-    margin: 1%;
-    padding-bottom: 1.5%;
-    border-radius: 15px;
-}
-.payout-info {
-    padding-top: 1.5%;
-    width: 100%;
-    /* Was min-width: 1250px, which pushed this panel off the left edge of any
-       viewport narrower than that, with no way to scroll it back into view. */
-    max-width: 1250px;
-    text-align: center;
-    margin-top: 0px;
-    letter-spacing: .2em;
-    background-color: rgba(128, 128, 128, 0.69);
-    margin: 1%;
-    padding-bottom: 1.5%;
-    border-radius: 15px;
-}
-
-.payout-info-container {
-    display:flex;
-    justify-content: center;
-}
-
-h5 {
-    text-align: center;
-}
-
-.leaderboard-heading {
-    text-align: center;
-    font-size: 1.75em;
-    font-weight: 700;
-}
-
-.leaderboard-table {
-    width: 90%;
-
-}
-
-/* The Submit buttons used to be hidden on every screen wider than 500px, which
-   left desktop users with no way to recalculate except pressing Enter. */
+/* These used to be hidden on every screen wider than 500px, leaving desktop
+   users no way to recalculate except guessing that Enter worked. */
 button {
-    font-size: 1.25em;
-    padding: 8px 20px;
-    border-radius: 15px;
+    font-size: clamp(0.75rem, 2vw, 0.9rem);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 0.6rem 1.25rem;
+    border-radius: 10px;
+    border: 1px solid var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
     cursor: pointer;
+}
+
+button:hover {
+    background: var(--accent);
+    color: #1b1f21;
 }
 
 .input-error {
     text-align: center;
-    font-size: 1.25em;
-    color: #a10000;
-    margin: 0 1em 1em;
+    font-size: 0.95rem;
+    color: var(--bad);
+    margin: 1rem 1rem 0;
     min-height: 1.4em;
+}
+
+/* --- prize boards --------------------------------------------------------- */
+
+.row-container {
+    display: flex;
+    justify-content: center;
+    padding: 0 1rem;
+}
+
+#row {
+    width: 100%;
+    max-width: 1100px;
+    display: flex;
+    /* Wrap rather than overflow: three fixed-width cards do not fit a phone or
+       a narrow embed column. */
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    margin: 1.5rem auto 0;
+}
+
+.leaderboard {
+    flex: 1 1 300px;
+    min-width: 0;
+    max-width: 420px;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: var(--radius);
+    padding: 0 0 1rem;
+    overflow: hidden;
+}
+
+.leaderboard-heading {
+    text-align: center;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-soft);
+    margin: 0 0 0.5rem;
+    padding: 0.9rem 0.5rem;
+}
+
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.leaderboard-table th {
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-dim);
+    padding: 0.4rem 1.1rem 0.6rem;
+}
+
+.leaderboard-table th:first-child,
+.leaderboard-table td:first-child {
+    text-align: left;
+}
+
+.leaderboard-table th:last-child,
+.leaderboard-table td:last-child {
+    text-align: right;
+}
+
+.leaderboard-table td {
+    font-size: clamp(0.95rem, 2.4vw, 1.05rem);
+    padding: 0.45rem 1.1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.leaderboard-table tbody tr:nth-child(odd) {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.empty-note {
+    text-align: center !important;
+    color: var(--ink-dim);
+    font-style: italic;
+    padding: 1.25rem 1rem !important;
 }
