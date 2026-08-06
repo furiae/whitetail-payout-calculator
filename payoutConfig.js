@@ -68,10 +68,14 @@ const CONFIG = {
         maxPlaces: 10,
 
         // Relative size of each place. Only the ratios matter - they are
-        // normalised against however many places are actually paying. These
-        // reproduce the shape of the current live board (1st is a bit over 4x
-        // 10th), so the prize list still "feels" the same.
-        weights: [6, 5, 4, 3.5, 2, 1.6, 1.55, 1.5, 1.45, 1.4],
+        // normalised against however many places are actually paying.
+        //
+        // These used to copy the old live board, whose 6th-10th were only 14%
+        // apart (1.6 down to 1.4). That tail was flat enough that on a small
+        // field all five rounded to the same number - 6th through 10th every
+        // one of them $500. The tail is now properly graded: 6th pays about
+        // 1.9x what 10th pays, so the places stay distinct at any field size.
+        weights: [6, 5, 4, 3.2, 2.4, 1.9, 1.6, 1.35, 1.15, 1.0],
 
         // Hard ceiling per place, in dollars. Once a big field pushes a place
         // past its cap the extra does NOT stay with the house: it first tops up
@@ -83,9 +87,11 @@ const CONFIG = {
         caps: [25000, 22500, 20000, 17500, 15000, 12500, 10000, 7500, 5000, 2500],
 
         // Round each prize down to a tidy number. First matching rule wins.
+        // A step wider than the gap between two places merges them, so the
+        // coarse steps only apply once the prizes are big enough to carry them.
         rounding: [
-            { minModel: 350, step: 250 },
-            { minModel: 100, step: 100 },
+            { minModel: 1000, step: 250 },
+            { minModel: 500, step: 100 },
             { minModel: 0, step: 50 },
         ],
     },
@@ -109,7 +115,7 @@ const CONFIG = {
         minWeightFraction: 0.25,
 
         rounding: [
-            { minModel: 350, step: 100 },
+            { minModel: 1000, step: 100 },
             { minModel: 0, step: 50 },
         ],
     },
@@ -143,8 +149,9 @@ const CONFIG = {
         ],
 
         rounding: [
-            { minModel: 200, step: 250 },
-            { minModel: 0, step: 100 },
+            { minModel: 1000, step: 250 },
+            { minModel: 300, step: 100 },
+            { minModel: 0, step: 50 },
         ],
     },
 };
