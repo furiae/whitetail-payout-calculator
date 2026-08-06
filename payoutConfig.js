@@ -113,13 +113,14 @@ const CONFIG = {
         // The spec always said 20 entries; the code had drifted to 40.
         minModel: 20,
 
-        // Point-class drawings. Weights are relative, same as everywhere else.
-        drawings: [
-            { label: '10PT', weight: 4 },
-            { label: '9PT', weight: 4 },
-            { label: '8PT', weight: 3 },
-            { label: '7PT', weight: 3 },
-        ],
+        // Point-class drawings. All four ALWAYS pay the same amount, so they
+        // share a single weight and are handed out as one block - that is what
+        // stops rounding from pulling them apart by an increment or two.
+        // They are also all-or-nothing: four prizes or none.
+        drawings: {
+            labels: ['10PT', '9PT', '8PT', '7PT'],
+            weight: 3.5,
+        },
 
         // "Lucky placing" prizes, each unlocked by its own entry threshold.
         milestones: [

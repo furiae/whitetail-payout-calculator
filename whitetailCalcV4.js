@@ -103,20 +103,33 @@ function chooseStep(maxStep, pool, weights) {
 // Hand out `pool` across `weights`, rounded down to a tidy step, then give the
 // rounding remainder back one step at a time from the top down. Handing it back
 // in descending order keeps the prizes non-increasing.
-function distribute(pool, weights, maxStep) {
-    const totalWeight = weights.reduce((a, b) => a + b, 0);
+//
+// `seats` says how many hunters each entry pays. An entry with four seats costs
+// four times its prize and is raised four seats at a time, so everyone in it is
+// always paid exactly the same - that is how the point classes stay level.
+// Returns the per-seat prize for each entry.
+function distribute(pool, weights, maxStep, seats) {
+    const seatCounts = seats || weights.map(() => 1);
+    const totalWeight = weights.reduce((sum, w, i) => sum + w * seatCounts[i], 0);
     if (totalWeight <= 0 || pool <= 0) return weights.map(() => 0);
 
-    const step = chooseStep(maxStep, pool, weights);
+    const step = chooseStep(maxStep, pool, weights.map((w, i) => w * seatCounts[i]));
     const prizes = weights.map(w => roundDownTo((pool * w) / totalWeight, step));
-    let leftover = pool - prizes.reduce((a, b) => a + b, 0);
+    let leftover = pool - prizes.reduce((sum, p, i) => sum + p * seatCounts[i], 0);
 
-    let i = 0;
     let guard = 0;
-    while (leftover >= step && guard < 10000) {
-        prizes[i % prizes.length] += step;
-        leftover -= step;
-        i++;
+    let progress = true;
+    while (leftover > 0 && progress && guard < 10000) {
+        progress = false;
+        for (let k = 0; k < prizes.length; k++) {
+            const cost = step * seatCounts[k];
+            if (cost > leftover) continue;
+            // Never let an entry climb past the one above it.
+            if (k > 0 && prizes[k] + step > prizes[k - 1]) continue;
+            prizes[k] += step;
+            leftover -= cost;
+            progress = true;
+        }
         guard++;
     }
     return prizes;
@@ -184,7 +197,8 @@ function distributeSpecialBoard(pool, drawings, milestones, step, floor) {
         const entries = (withDrawings ? drawings : [])
             .concat(milestones.slice(0, milestoneCount));
         if (!entries.length) return null;
-        const prizes = distribute(pool, entries.map(e => e.weight), step);
+        const prizes = distribute(pool, entries.map(e => e.weight), step,
+            entries.map(e => e.seats));
         if (prizes.some(p => p < floor)) return null;
         return { entries, prizes };
     };
@@ -251,7 +265,16 @@ function buildBoard(entries, entryFee) {
         specialHarvest: specialOn,
     };
 
-    const drawings = drawingsOn ? CONFIG.specialHarvest.drawings : [];
+    // The four point classes are one unit paying four hunters the same amount.
+    // Milestones are separate units paying one hunter each.
+    const drawings = drawingsOn ? [{
+        labels: CONFIG.specialHarvest.drawings.labels,
+        weight: CONFIG.specialHarvest.drawings.weight,
+        seats: CONFIG.specialHarvest.drawings.labels.length,
+    }] : [];
+    const milestoneUnits = milestones.map(m => ({
+        labels: [m.label], weight: m.weight, seats: 1,
+    }));
     // Filled in below - only the prizes the board can actually fund.
     let specialEntries = [];
 
@@ -309,7 +332,7 @@ function buildBoard(entries, entryFee) {
             : 0;
         if (active.specialHarvest) {
             const board = distributeSpecialBoard(
-                specialPool, drawings, milestones,
+                specialPool, drawings, milestoneUnits,
                 stepFor(CONFIG.specialHarvest.rounding, model),
                 floor);
             specialEntries = board.entries;
@@ -364,7 +387,7 @@ function buildBoard(entries, entryFee) {
                 // Rebuilt through the same all-or-nothing rule: a bigger pool
                 // may now afford prizes the first pass could not.
                 const rebuilt = distributeSpecialBoard(
-                    specialPool, drawings, milestones,
+                    specialPool, drawings, milestoneUnits,
                     stepFor(CONFIG.specialHarvest.rounding, model),
                     floor);
                 specialEntries = rebuilt.entries;
@@ -392,7 +415,7 @@ function buildBoard(entries, entryFee) {
         const sumOf = () =>
             topPrizes.reduce((a, b) => a + b, 0)
             + perSeat.reduce((a, b) => a + b, 0) * seats
-            + specialPrizes.reduce((a, b) => a + b, 0);
+            + specialPrizes.reduce((sum, p, i) => sum + p * (specialEntries[i] ? specialEntries[i].seats : 1), 0);
 
         const idealsFor = (prizes, weights, pool) => {
             const total = weights.reduce((a, b) => a + b, 0);
@@ -403,7 +426,7 @@ function buildBoard(entries, entryFee) {
         const outIdeal = idealsFor(perSeat, tierWeights,
             perSeat.reduce((a, b) => a + b, 0));
         const specIdeal = idealsFor(specialPrizes, specialEntries.map(e => e.weight),
-            specialPrizes.reduce((a, b) => a + b, 0));
+            specialPrizes.reduce((sum, p, i) => sum + p * specialEntries[i].seats, 0));
 
         let payout = sumOf();
         for (let guard = 0; guard < 5000 && payout < targetPayout; guard++) {
@@ -430,7 +453,9 @@ function buildBoard(entries, entryFee) {
                 if (v <= 0) return;
                 const above = i > 0 ? specialPrizes[i - 1] : Infinity;
                 if (v + INCREMENT > above) return;
-                candidates.push({ cost: INCREMENT, deficit: specIdeal[i] - v,
+                // A four-seat unit costs four increments and all four move together.
+                const unitSeats = specialEntries[i] ? specialEntries[i].seats : 1;
+                candidates.push({ cost: INCREMENT * unitSeats, deficit: specIdeal[i] - v,
                     apply: () => { specialPrizes[i] += INCREMENT; } });
             });
 
@@ -460,9 +485,13 @@ function buildBoard(entries, entryFee) {
         start += placesPerTier;
     }
 
-    const specialRows = specialEntries
-        .map((e, i) => ({ label: e.label, amount: specialPrizes[i] || 0, seats: 1 }))
-        .filter(r => r.amount > 0);
+    const specialRows = [];
+    specialEntries.forEach((unit, i) => {
+        const amount = specialPrizes[i] || 0;
+        if (amount <= 0) return;
+        // One row per label; every label in a unit shows the same amount.
+        for (const label of unit.labels) specialRows.push({ label, amount, seats: 1 });
+    });
 
     const allRows = [...topRows, ...outsideRows, ...specialRows];
     const hunterPayout = allRows.reduce((sum, r) => sum + r.amount * r.seats, 0);
