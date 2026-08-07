@@ -228,6 +228,14 @@ function distributeSpecialBoard(pool, drawings, milestones, step, floor) {
             prizes = prizes.map((p, i) => p + extra[i]);
         }
 
+        // Final clamp: the redistribution loop above can hand out one last
+        // increment on its closing pass, which is how 300th came to pay $6,250
+        // against a $6,000 ceiling.
+        prizes = prizes.map((p, i) => {
+            const cap = entries[i].cap;
+            return (typeof cap === 'number' && p > cap) ? cap : p;
+        });
+
         if (prizes.some(p => p < floor)) return null;
         return { entries, prizes };
     };
@@ -254,13 +262,24 @@ function gradedWeights(count, ratio) {
 }
 
 // What a set of places costs if the lowest one sits exactly on the floor.
-// Rounded UP to the increment: funding it to the exact penny leaves the lowest
+//
+// Closed form rather than building the weights: they are a geometric series
+// with the smallest term at 1, so the total is just the sum of that series.
+// This sits inside a binary search that runs for every board, and building
+// arrays there cost 17ms a board.
+//
+// Rounded UP to the increment: funding to the exact penny leaves the lowest
 // place at $449.99999999999994 in floating point, which rounds down to $400,
 // fails the floor check, and silently costs someone their prize.
 function costOfPlaces(count, ratio, floorAmt) {
-    const w = gradedWeights(count, ratio);
-    const exact = (floorAmt * w.reduce((a, b) => a + b, 0)) / Math.min(...w);
-    return roundUpTo(exact, CONFIG.payoutIncrement);
+    let sum;
+    if (count <= 1) {
+        sum = 1;
+    } else {
+        const q = Math.pow(ratio, 1 / (count - 1));
+        sum = Math.abs(q - 1) < 1e-12 ? count : (Math.pow(q, count) - 1) / (q - 1);
+    }
+    return roundUpTo(floorAmt * sum, CONFIG.payoutIncrement);
 }
 
 // The widest gap the money can carry while still paying every place at least
@@ -269,7 +288,7 @@ function fitRatio(pool, count, floorAmt, maxRatio) {
     if (costOfPlaces(count, 1, floorAmt) > pool) return null;
     if (costOfPlaces(count, maxRatio, floorAmt) <= pool) return maxRatio;
     let lo = 1, hi = maxRatio;
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 24; i++) {
         const mid = (lo + hi) / 2;
         if (costOfPlaces(count, mid, floorAmt) <= pool) lo = mid; else hi = mid;
     }
@@ -349,7 +368,7 @@ function buildBoard(entries, entryFee) {
         cap: CONFIG.specialHarvest.drawings.cap,
     }] : [];
     const milestoneUnits = milestones.map(m => ({
-        labels: [m.label], weight: m.weight, seats: 1,
+        labels: [m.label], weight: m.weight, seats: 1, cap: m.cap,
     }));
     // Filled in below - only the prizes the board can actually fund.
     let specialEntries = [];
@@ -521,7 +540,18 @@ function buildBoard(entries, entryFee) {
                 Math.floor((outsideCeilingNow - floor) / INCREMENT) + 1);
             const outsideMaxRatio = Math.max(1, outsideCeilingNow / floor);
 
+            // How many places the money can actually carry. Every place must be
+            // a distinct $50 step above the floor, so the cheapest possible
+            // ladder of k places is 450 + 500 + 550 ... - NOT k x 450.
+            //
+            // Costing it as k x the floor said "eleven places at $450" on a
+            // $5,000 pool; the descent then had nowhere to put nine of them and
+            // zeroed them, so 200 entries paid two hunters outside the top ten
+            // while $5,000 sat unspent. The ladder cost is what decides it now.
+            const ladderCost = k => k * floor + INCREMENT * (k * (k - 1)) / 2;
             let count = Math.min(tiers, CONFIG.outsideTopTen.maxTiers, roomForDistinct);
+            while (count > 1 && ladderCost(count) > outsidePool) count -= 1;
+
             let outsideRatio = fitRatio(outsidePool, count, floor, outsideMaxRatio);
             while (outsideRatio === null && count > 1) {
                 count -= 1;

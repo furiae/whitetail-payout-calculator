@@ -109,7 +109,10 @@ const CONFIG = {
         // reads evenly AND holds $165,000.
         //
         // Set to null to remove the ceilings entirely.
-        caps: [25000, 22500, 20500, 18500, 16500, 15000, 13500, 12500, 11000, 10000],
+        // No ceiling on the top ten. Special Harvest is capped per prize
+        // instead, so a big field lifts the places hunters actually competed
+        // for rather than piling into the drawings.
+        caps: null,
 
         // Round each prize down to a tidy number. First matching rule wins.
         // A step wider than the gap between two places merges them, so the
@@ -170,14 +173,14 @@ const CONFIG = {
 
         // "Lucky placing" prizes, each unlocked by its own entry threshold.
         milestones: [
-            { label: '100th', minModel: 300, weight: 2 },
-            { label: '200th', minModel: 500, weight: 2 },
-            { label: '300th', minModel: 800, weight: 0.6 },
-            { label: '400th', minModel: 1000, weight: 0.6 },
-            { label: '500th', minModel: 1200, weight: 0.6 },
-            { label: '750th', minModel: 1750, weight: 0.6 },
-            { label: '1000th', minModel: 2000, weight: 0.6 },
-            { label: '1250th', minModel: 2500, weight: 0.6 },
+            { label: '100th', minModel: 300, weight: 2, cap: 4500 },
+            { label: '200th', minModel: 500, weight: 2, cap: 4000 },
+            { label: '300th', minModel: 800, weight: 0.6, cap: 3500 },
+            { label: '400th', minModel: 1000, weight: 0.6, cap: 3000 },
+            { label: '500th', minModel: 1200, weight: 0.6, cap: 2500 },
+            { label: '750th', minModel: 1750, weight: 0.6, cap: 2000 },
+            { label: '1000th', minModel: 2000, weight: 0.6, cap: 1500 },
+            { label: '1250th', minModel: 2500, weight: 0.6, cap: 1000 },
         ],
 
         rounding: [
