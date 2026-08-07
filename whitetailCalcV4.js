@@ -568,10 +568,24 @@ function buildBoard(entries, entryFee) {
     // usually finds a home for it, so anything counted earlier is provisional.
     unallocated = Math.max(0, purse - hunterPayout);
 
+    // Why an empty board is empty. "Unlocks at N entries" is only true when the
+    // entry count is the actual reason; more often the top ten is still
+    // absorbing the whole purse, and saying otherwise reads as a bug.
+    const outsideNote = outsideRows.length ? '' :
+        model < CONFIG.outsideTopTen.minModel
+            ? `Unlocks at ${CONFIG.outsideTopTen.minModel} entries`
+            : `The top ten is funded first - a few more entries opens this up`;
+
+    const specialNote = specialRows.length ? '' :
+        model < CONFIG.specialHarvest.minModel
+            ? `Unlocks at ${CONFIG.specialHarvest.minModel} entries`
+            : `All four point classes must be affordable together`;
+
     return {
         entries, entryFee, model, revenue, hunterPayout, grossMargin,
         marginPercent: revenue > 0 ? Math.round((grossMargin / revenue) * 100) : 0,
         topRows, outsideRows, specialRows, unallocated,
+        outsideNote, specialNote,
     };
 }
 
@@ -603,10 +617,8 @@ function renderRows(tbody, rows, emptyMessage) {
 
 function render(board) {
     renderRows(topTenBody, board.topRows, 'No prizes yet');
-    renderRows(outsideBody, board.outsideRows,
-        `Unlocks at ${CONFIG.outsideTopTen.minModel} entries`);
-    renderRows(specialBody, board.specialRows,
-        `Unlocks at ${CONFIG.specialHarvest.minModel} entries`);
+    renderRows(outsideBody, board.outsideRows, board.outsideNote);
+    renderRows(specialBody, board.specialRows, board.specialNote);
 
     summaryEntries.textContent = board.entries.toLocaleString('en-US');
     summaryModel.textContent = board.model.toLocaleString('en-US');
