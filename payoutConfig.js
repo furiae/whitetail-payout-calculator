@@ -105,19 +105,23 @@ const CONFIG = {
     outsideTopTen: {
         // No prizes outside the top 10 until this many entries.
         minModel: 100,
-        // One extra bracket per N hunters. Lower means more brackets, so more
-        // hunters are paid something.
-        huntersPerTier: 50,
-        // ...each bracket covering this many finishing places...
-        placesPerTier: 5,
-        // ...up to this many brackets. 13 brackets x 5 places = 11th through
-        // 75th, and the board never goes past 75th place.
-        maxTiers: 13,
 
-        // Each bracket is worth this much less than the one above it, as a
-        // fraction of the first bracket. Floored so deep brackets stay worth
-        // showing up for.
-        decayPerTier: 0.08,
+        // Each row is ONE finishing place, funded on its own. It used to be a
+        // bracket of five paid the same amount, which meant 11th-15th had to be
+        // affordable all together or none of them showed at all. Now the board
+        // simply pays as far down as the money reaches.
+        placesPerTier: 1,
+
+        // One extra place paid per N hunters.
+        huntersPerTier: 10,
+
+        // 65 places = 11th through 75th, and the board never goes past 75th.
+        maxTiers: 65,
+
+        // Each place is worth this much less than the one above it, as a
+        // fraction of 11th. Floored so the deepest places stay worth winning -
+        // 11th pays 4x what 75th pays.
+        decayPerTier: 0.0117,
         minWeightFraction: 0.25,
 
         rounding: [
