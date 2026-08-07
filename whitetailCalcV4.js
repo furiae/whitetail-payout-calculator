@@ -250,10 +250,15 @@ function topPlacesPaid(model) {
     return Math.min(Math.max(raw, CONFIG.topTen.minPlaces), CONFIG.topTen.maxPlaces);
 }
 
+// One paid place per 10 hunters, counting straight on past 10th. The first ten
+// are the top ten; everything after that lands in this column. So 11th cannot
+// appear before 10th exists - the rule enforces itself rather than needing a
+// magic entry threshold - and the board grows one place at a time.
 function outsideTierCount(model) {
     if (model < CONFIG.outsideTopTen.minModel) return 0;
-    const raw = Math.floor(model / CONFIG.outsideTopTen.huntersPerTier) + 1;
-    return Math.min(raw, CONFIG.outsideTopTen.maxTiers);
+    const totalPlaces = Math.floor(model / CONFIG.outsideTopTen.huntersPerTier);
+    const beyondTopTen = totalPlaces - CONFIG.topTen.maxPlaces;
+    return Math.max(0, Math.min(beyondTopTen, CONFIG.outsideTopTen.maxTiers));
 }
 
 function unlockedMilestones(model) {
@@ -366,7 +371,9 @@ function buildBoard(entries, entryFee) {
         const outsideCeilingNow = paidTopCount ? Math.min(...topPrizes.filter(v => v > 0)) : Infinity;
         // Outside stays shut while any top-ten place is unpaid - which now
         // happens naturally, because a short top ten leaves nothing over.
-        const outsideOpen = active.outsideTopTen && paidTopCount >= places;
+        const outsideOpen = active.outsideTopTen
+            && paidTopCount >= places
+            && paidTopCount >= CONFIG.topTen.maxPlaces;
         let outsidePool = outsideOpen ? outsideBase + capped.overflow : 0;
         let leftForSpecial = outsideOpen ? 0 : capped.overflow;
 
