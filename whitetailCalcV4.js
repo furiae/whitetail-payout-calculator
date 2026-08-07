@@ -435,17 +435,49 @@ function buildBoard(entries, entryFee) {
         // Without this the column flickered: shown at 57-59 entries, gone from
         // 60 when the outside column opened and took its 31% back, and not seen
         // again until 87.
-        const afterTopTen = purse - topPool;
+        // Pay the top ten first, so we know what 10th is worth.
+        const topStep = stepFor(CONFIG.topTen.rounding, model);
+        const firstPass = applyCaps(
+            distributeWithFloor(topPool, topWeights, topStep, floor, true),
+            CONFIG.topTen.caps, topStep);
+
+        // The outside column can only hold so much: its ladder runs from one
+        // increment under 10th down to the floor in $50 steps, so there is a
+        // hard ceiling on what it can legally absorb. Reserving a full 31% for
+        // it when it can only take a single $450 place left the surplus washing
+        // into Special Harvest - which is how the point classes came to pay
+        // $1,950 against a $1,650 first place.
+        //
+        // So measure that capacity, and hand anything beyond it back to the top
+        // ten. The placings keep the money; the drawings only ever get their
+        // own share.
+        const firstPaid = firstPass.prizes.filter(v => v > 0);
+        let rung = firstPaid.length ? Math.min(...firstPaid) - INCREMENT : 0;
+        let outsideCapacity = 0;
+        for (let seats = 0; rung >= floor && seats < CONFIG.outsideTopTen.maxTiers;
+             rung -= INCREMENT, seats++) {
+            outsideCapacity += rung;
+        }
+
+        const afterTopTenFirst = purse - topPool;
         const specialWanted = purse * shareOf('specialHarvest');
         const specialFirst = active.specialHarvest
-            ? Math.min(Math.max(specialWanted, blockNeeds), afterTopTen)
+            ? Math.min(Math.max(specialWanted, blockNeeds), afterTopTenFirst)
             : 0;
-        const outsideBase = Math.max(0, afterTopTen - specialFirst);
+        const outsideWanted = Math.max(0, afterTopTenFirst - specialFirst);
+        const usableOutside = Math.min(outsideWanted, outsideCapacity);
+        const handedBackToTopTen = outsideWanted - usableOutside;
 
-        const topStep = stepFor(CONFIG.topTen.rounding, model);
-        const uncapped = distributeWithFloor(topPool, topWeights, topStep, floor, true);
-        const capped = applyCaps(uncapped, CONFIG.topTen.caps, topStep);
-        topPrizes = capped.prizes;
+        let cappedOverflow = firstPass.overflow;
+        topPrizes = firstPass.prizes;
+        if (handedBackToTopTen > 0) {
+            const boosted = applyCaps(
+                distributeWithFloor(topPool + handedBackToTopTen, topWeights,
+                    topStep, floor, true),
+                CONFIG.topTen.caps, topStep);
+            topPrizes = boosted.prizes;
+            cappedOverflow = boosted.overflow;
+        }
 
         // Money the top ten could not hold goes to the other boards rather than
         // to the house. The placings get first call on it: paying more hunters
@@ -472,8 +504,8 @@ function buildBoard(entries, entryFee) {
             // If 10th is still on the floor there is no legal room beneath it:
             // 11th would have to be below the 2x minimum, which never happens.
             && outsideCeilingNow >= floor;
-        let outsidePool = outsideOpen ? outsideBase + capped.overflow : 0;
-        let leftForSpecial = outsideOpen ? 0 : capped.overflow;
+        let outsidePool = outsideOpen ? usableOutside + cappedOverflow : 0;
+        let leftForSpecial = outsideOpen ? 0 : cappedOverflow;
 
         if (outsideOpen && outsidePool > 0) {
             const outStep = stepFor(CONFIG.outsideTopTen.rounding, model);
