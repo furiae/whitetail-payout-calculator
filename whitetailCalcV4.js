@@ -108,7 +108,7 @@ function chooseStep(maxStep, pool, weights) {
 // four times its prize and is raised four seats at a time, so everyone in it is
 // always paid exactly the same - that is how the point classes stay level.
 // Returns the per-seat prize for each entry.
-function distribute(pool, weights, maxStep, seats) {
+function distribute(pool, weights, maxStep, seats, strict) {
     const seatCounts = seats || weights.map(() => 1);
     const totalWeight = weights.reduce((sum, w, i) => sum + w * seatCounts[i], 0);
     if (totalWeight <= 0 || pool <= 0) return weights.map(() => 0);
@@ -124,8 +124,15 @@ function distribute(pool, weights, maxStep, seats) {
         for (let k = 0; k < prizes.length; k++) {
             const cost = step * seatCounts[k];
             if (cost > leftover) continue;
-            // Never let an entry climb past the one above it.
-            if (k > 0 && prizes[k] + step > prizes[k - 1]) continue;
+            // Never let an entry climb past the one above it. `strict` also
+            // forbids drawing level with it - finishing places are a ladder, so
+            // handing back leftovers must not merge 11th through 20th onto one
+            // figure. Special Harvest passes strict = false, because the four
+            // point classes are deliberately equal.
+            if (k > 0) {
+                const room = strict ? prizes[k - 1] - step : prizes[k - 1];
+                if (prizes[k] + step > room) continue;
+            }
             prizes[k] += step;
             leftover -= cost;
             progress = true;
@@ -140,9 +147,9 @@ function distribute(pool, weights, maxStep, seats) {
 // and the whole pool is still handed out, which is what keeps the margin on
 // target. Returns an array the same length as `weights`, zero-padded for the
 // prizes that were dropped.
-function distributeWithFloor(pool, weights, maxStep, floor) {
+function distributeWithFloor(pool, weights, maxStep, floor, strict) {
     for (let count = weights.length; count >= 1; count--) {
-        const prizes = distribute(pool, weights.slice(0, count), maxStep);
+        const prizes = distribute(pool, weights.slice(0, count), maxStep, null, strict);
         if (prizes[count - 1] >= floor) {
             return prizes.concat(new Array(weights.length - count).fill(0));
         }
@@ -436,7 +443,7 @@ function buildBoard(entries, entryFee) {
         const outsideBase = Math.max(0, afterTopTen - specialFirst);
 
         const topStep = stepFor(CONFIG.topTen.rounding, model);
-        const uncapped = distributeWithFloor(topPool, topWeights, topStep, floor);
+        const uncapped = distributeWithFloor(topPool, topWeights, topStep, floor, true);
         const capped = applyCaps(uncapped, CONFIG.topTen.caps, topStep);
         topPrizes = capped.prizes;
 
@@ -470,32 +477,43 @@ function buildBoard(entries, entryFee) {
 
         if (outsideOpen && outsidePool > 0) {
             const outStep = stepFor(CONFIG.outsideTopTen.rounding, model);
-            let count = tiers;
-            let result = distributeWithFloor(outsidePool / placesPerTier,
-                weightsForTiers(count), outStep, floor);
-            let funded = result.filter(v => v > 0).length;
-            while ((result[0] || 0) > outsideCeilingNow
-                   && count < CONFIG.outsideTopTen.maxTiers) {
-                const next = distributeWithFloor(outsidePool / placesPerTier,
-                    weightsForTiers(count + 1), outStep, floor);
-                const nextFunded = next.filter(v => v > 0).length;
-                // If an extra bracket cannot actually be funded above the floor,
-                // adding more is pointless - the pool simply is not deep enough.
-                if (nextFunded <= funded) break;
-                count++;
-                result = next;
-                funded = nextFunded;
+
+            // Grade these the same way as the top ten: widest gap the money can
+            // carry, between the floor and one increment under 10th place.
+            //
+            // And never pay more places than there are distinct values to give
+            // them. At 115 entries 10th pays $500, so 11th can be at most $450 -
+            // which is the floor - leaving exactly one legal value. Paying ten
+            // places there put $450 against every one of 11th through 20th.
+            const roomForDistinct = Math.max(1,
+                Math.floor((outsideCeilingNow - floor) / INCREMENT) + 1);
+            const outsideMaxRatio = Math.max(1, outsideCeilingNow / floor);
+
+            let count = Math.min(tiers, CONFIG.outsideTopTen.maxTiers, roomForDistinct);
+            let outsideRatio = fitRatio(outsidePool, count, floor, outsideMaxRatio);
+            while (outsideRatio === null && count > 1) {
+                count -= 1;
+                outsideRatio = fitRatio(outsidePool, count, floor, outsideMaxRatio);
             }
-            // Still over the ceiling with every bracket allowed? Clamp, and hand
-            // the difference to special harvest.
-            const clamped = result
-                .map(v => Math.min(v, outsideCeilingNow))
-                .map(v => (v < floor ? 0 : v));
+
+            let result = outsideRatio === null ? []
+                : distributeWithFloor(outsidePool, gradedWeights(count, outsideRatio),
+                    outStep, floor, true);
+
+            // Clamp DOWN the ladder, not flat against the ceiling. Clamping every
+            // place to the same maximum is what put $600 against 11th through
+            // 14th: each place is instead held one increment below the one above.
+            let rung = outsideCeilingNow;
+            const clamped = result.map(v => {
+                const amount = Math.min(v, rung);
+                rung = amount - INCREMENT;
+                return amount < floor ? 0 : amount;
+            });
             leftForSpecial = (result.reduce((a, b) => a + b, 0)
-                - clamped.reduce((a, b) => a + b, 0)) * placesPerTier;
+                - clamped.reduce((a, b) => a + b, 0));
             perSeat = clamped;
             tiers = count;
-            tierWeights = weightsForTiers(count);
+            tierWeights = outsideRatio === null ? [] : gradedWeights(count, outsideRatio);
         } else {
             perSeat = [];
         }
@@ -611,13 +629,15 @@ function buildBoard(entries, entryFee) {
             topPrizes.forEach((v, i) => {
                 if (v <= 0) return;
                 const cap = CONFIG.topTen.caps ? CONFIG.topTen.caps[i] : Infinity;
-                const limit = Math.min(cap, i > 0 ? topPrizes[i - 1] : Infinity);
+                // Stop one increment short of the place above: handing money back
+                // must not flatten the ladder into a run of identical prizes.
+                const limit = Math.min(cap, i > 0 ? topPrizes[i - 1] - INCREMENT : Infinity);
                 candidates.push({ v, limit, cost: INCREMENT, deficit: topIdeal[i] - v,
                     bump: k => { topPrizes[i] += k * INCREMENT; } });
             });
             perSeat.forEach((v, i) => {
                 if (v <= 0) return;
-                const limit = Math.min(outsideCeiling, i > 0 ? perSeat[i - 1] : Infinity);
+                const limit = Math.min(outsideCeiling, i > 0 ? perSeat[i - 1] - INCREMENT : Infinity);
                 candidates.push({ v, limit, cost: INCREMENT * seats, deficit: outIdeal[i] - v,
                     bump: k => { perSeat[i] += k * INCREMENT; } });
             });
