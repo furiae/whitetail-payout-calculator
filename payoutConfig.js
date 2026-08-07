@@ -63,7 +63,9 @@ const CONFIG = {
 
     topTen: {
         // One paid place per N hunters, clamped to [minPlaces, maxPlaces].
-        huntersPerPlace: 10,
+        // Must match outsideTopTen.huntersPerTier - the outside column simply
+        // continues this same ladder past 10th.
+        huntersPerPlace: 5,
         minPlaces: 3,
         maxPlaces: 10,
 
@@ -114,8 +116,9 @@ const CONFIG = {
         // simply pays as far down as the money reaches.
         placesPerTier: 1,
 
-        // One extra place paid per N hunters.
-        huntersPerTier: 10,
+        // One extra place paid per N hunters. Keep in step with
+        // topTen.huntersPerPlace: this is one continuous ladder.
+        huntersPerTier: 5,
 
         // 65 places = 11th through 75th, and the board never goes past 75th.
         maxTiers: 65,
