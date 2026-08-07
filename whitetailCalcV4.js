@@ -368,12 +368,22 @@ function buildBoard(entries, entryFee) {
         // DEEPER - so the board grows brackets until the money fits or it runs
         // out of room. Whatever is still left goes to special harvest.
         const paidTopCount = topPrizes.filter(v => v > 0).length;
-        const outsideCeilingNow = paidTopCount ? Math.min(...topPrizes.filter(v => v > 0)) : Infinity;
+        // 11th must be STRICTLY below 10th - never merely equal to it. So the
+        // ceiling for the outside column is one increment under the smallest
+        // top-ten prize. A knock-on: the column cannot open at all until 10th
+        // clears the floor by an increment, which is exactly right - a board
+        // showing 10th through 20th all on the same figure helps nobody.
+        const outsideCeilingNow = paidTopCount
+            ? Math.min(...topPrizes.filter(v => v > 0)) - INCREMENT
+            : Infinity;
         // Outside stays shut while any top-ten place is unpaid - which now
         // happens naturally, because a short top ten leaves nothing over.
         const outsideOpen = active.outsideTopTen
             && paidTopCount >= places
-            && paidTopCount >= CONFIG.topTen.maxPlaces;
+            && paidTopCount >= CONFIG.topTen.maxPlaces
+            // If 10th is still on the floor there is no legal room beneath it:
+            // 11th would have to be below the 2x minimum, which never happens.
+            && outsideCeilingNow >= floor;
         let outsidePool = outsideOpen ? outsideBase + capped.overflow : 0;
         let leftForSpecial = outsideOpen ? 0 : capped.overflow;
 
@@ -397,7 +407,9 @@ function buildBoard(entries, entryFee) {
             }
             // Still over the ceiling with every bracket allowed? Clamp, and hand
             // the difference to special harvest.
-            const clamped = result.map(v => Math.min(v, outsideCeilingNow));
+            const clamped = result
+                .map(v => Math.min(v, outsideCeilingNow))
+                .map(v => (v < floor ? 0 : v));
             leftForSpecial = (result.reduce((a, b) => a + b, 0)
                 - clamped.reduce((a, b) => a + b, 0)) * placesPerTier;
             perSeat = clamped;
@@ -439,7 +451,7 @@ function buildBoard(entries, entryFee) {
     // Anything trimmed goes back to the top ten, up to the caps.
     const paidTop = topPrizes.filter(v => v > 0);
     if (paidTop.length && perSeat.length) {
-        const ceiling = Math.min(...paidTop);
+        const ceiling = Math.min(...paidTop) - INCREMENT;
         const seats = placesPerTier;
         let reclaimed = 0;
         perSeat = perSeat.map(amount => {
@@ -508,7 +520,7 @@ function buildBoard(entries, entryFee) {
         let payout = sumOf();
         for (let guard = 0; guard < 400 && payout < targetPayout; guard++) {
             const paidTopNow = topPrizes.filter(v => v > 0);
-            const outsideCeiling = paidTopNow.length ? Math.min(...paidTopNow) : Infinity;
+            const outsideCeiling = paidTopNow.length ? Math.min(...paidTopNow) - INCREMENT : Infinity;
             const candidates = [];
 
             // limit = the highest this prize may legally reach.
