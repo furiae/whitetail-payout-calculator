@@ -103,8 +103,10 @@ const CONFIG = {
     },
 
     outsideTopTen: {
-        // No prizes outside the top 10 until this many entries.
-        minModel: 100,
+        // No hard entry threshold. The board funds the top ten first and pays
+        // out here with whatever is left, so this column appears on its own
+        // once there is money spare - no cliff at a magic number.
+        minModel: 0,
 
         // Each row is ONE finishing place, funded on its own. It used to be a
         // bracket of five paid the same amount, which meant 11th-15th had to be

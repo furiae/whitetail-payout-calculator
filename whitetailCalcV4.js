@@ -326,12 +326,31 @@ function buildBoard(entries, entryFee) {
             ? CONFIG.purseSplit[key] / activeTotal
             : 0);
 
+        // The top ten is funded FIRST, and only borrows what it actually needs.
+        //
+        // This used to be all-or-nothing: if the top ten came up short, the
+        // outside board switched off entirely and handed back its whole 31%.
+        // One extra hunter then flipped it back on, and the board lurched -
+        // at a $225 entry, going from 103 to 104 entries paid nine more
+        // hunters but cut 10th place from $650 to $450.
+        //
+        // Now the top ten takes its share, tops up to whatever it needs to keep
+        // its lowest place above the floor, and the outside board pays as far
+        // down as the remainder reaches. One more hunter is always one more
+        // dollar, never a cliff.
+        const topWeights = CONFIG.topTen.weights.slice(0, places);
+        const sumTopWeights = topWeights.reduce((a, b) => a + b, 0);
+        const minTopWeight = Math.min(...topWeights);
+        const needForFloor = (floor * sumTopWeights) / minTopWeight;
+
+        const placingsPool = purse * (shareOf('topTen') + shareOf('outsideTopTen'));
+        const topPool = Math.min(
+            Math.max(purse * shareOf('topTen'), needForFloor),
+            placingsPool);
+        const outsideBase = placingsPool - topPool;
+
         const topStep = stepFor(CONFIG.topTen.rounding, model);
-        const uncapped = distributeWithFloor(
-            purse * shareOf('topTen'),
-            CONFIG.topTen.weights.slice(0, places),
-            topStep,
-            floor);
+        const uncapped = distributeWithFloor(topPool, topWeights, topStep, floor);
         const capped = applyCaps(uncapped, CONFIG.topTen.caps, topStep);
         topPrizes = capped.prizes;
 
@@ -343,12 +362,15 @@ function buildBoard(entries, entryFee) {
         // brackets are all at that ceiling the only way to absorb more is to pay
         // DEEPER - so the board grows brackets until the money fits or it runs
         // out of room. Whatever is still left goes to special harvest.
-        const outsideCeilingNow = Math.min(...topPrizes.filter(v => v > 0));
-        const outsideBase = purse * shareOf('outsideTopTen');
-        let outsidePool = active.outsideTopTen ? outsideBase + capped.overflow : 0;
-        let leftForSpecial = active.outsideTopTen ? 0 : capped.overflow;
+        const paidTopCount = topPrizes.filter(v => v > 0).length;
+        const outsideCeilingNow = paidTopCount ? Math.min(...topPrizes.filter(v => v > 0)) : Infinity;
+        // Outside stays shut while any top-ten place is unpaid - which now
+        // happens naturally, because a short top ten leaves nothing over.
+        const outsideOpen = active.outsideTopTen && paidTopCount >= places;
+        let outsidePool = outsideOpen ? outsideBase + capped.overflow : 0;
+        let leftForSpecial = outsideOpen ? 0 : capped.overflow;
 
-        if (active.outsideTopTen) {
+        if (outsideOpen && outsidePool > 0) {
             const outStep = stepFor(CONFIG.outsideTopTen.rounding, model);
             let count = tiers;
             let result = distributeWithFloor(outsidePool / placesPerTier,
@@ -392,13 +414,9 @@ function buildBoard(entries, entryFee) {
             specialPrizes = [];
         }
 
-        // Paying 11th while 10th gets nothing makes no sense to a hunter, so the
-        // outside board only opens once every top-ten place is funded. If the
-        // top ten is short, the outside share goes back to it instead.
-        const topFullyPaid = topPrizes.filter(v => v > 0).length >= places;
         const stillPaying = {
             topTen: true,
-            outsideTopTen: perSeat.some(v => v > 0) && topFullyPaid,
+            outsideTopTen: active.outsideTopTen,
             specialHarvest: specialPrizes.some(v => v > 0),
         };
         if (stillPaying.outsideTopTen === active.outsideTopTen
