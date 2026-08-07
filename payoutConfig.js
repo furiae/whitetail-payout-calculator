@@ -12,10 +12,26 @@
 
 const CONFIG = {
 
-    // Share of gross revenue paid back to hunters, before the increment is
-    // applied. 0.65 => a 35% house margin, which is what the spec asked for.
-    // See marginBand below for how far this is allowed to move.
-    payoutRate: 0.65,
+    // Share of gross revenue paid back to hunters, by field size.
+    //
+    // A thin field pays out more so the board can actually fill: at or below
+    // `smallField` entries the house takes 30%, and that eases evenly up to the
+    // full 35% by `fullField` entries. It costs very little - about $500 at 50
+    // entries and near nothing above that, because on a small board the extra
+    // money often cannot be spent anyway once prizes have to land on $50 and
+    // clear the floor. What it buys is Special Harvest appearing at 57 entries
+    // instead of 88.
+    payout: {
+        smallRate: 0.70,   // 30% margin
+        smallField: 50,
+        fullRate: 0.65,    // 35% margin
+        fullField: 100,
+    },
+
+    // How far below the target margin we may go to make prizes land on the
+    // increment. Rounding down always strands money; this is the allowance to
+    // hand it back rather than quietly keep it.
+    marginFlex: 0.02,
 
     // Every prize lands on a whole multiple of this. No $510, no $225.
     // Caps and floors are snapped to it too, so nothing can sneak past.
@@ -69,15 +85,16 @@ const CONFIG = {
         minPlaces: 3,
         maxPlaces: 10,
 
-        // Relative size of each place. Only the ratios matter - they are
-        // normalised against however many places are actually paying.
+        // How much more 1st wins than 10th, at most. 3 means 1st takes three
+        // times what 10th takes, with the places in between spaced evenly.
         //
-        // A smooth curve from 1st to 10th at a 3:1 ratio - each place is worth
-        // about 11% more than the one below it. Earlier versions copied the old
-        // live board and were far steeper (6:1), which made the gaps at the top
-        // feel brutal, and had a flat 6th-10th tail that rounded to a single
-        // number on small fields.
-        weights: [3.0, 2.658, 2.354, 2.085, 1.847, 1.636, 1.449, 1.284, 1.137, 1.0],
+        // This is a CEILING, not a fixed shape. When a field is too small to
+        // spread the prizes that wide without dropping someone below the floor,
+        // the gaps tighten instead - every place still gets paid, just closer
+        // together. As the field grows the gaps open back out to this figure.
+        // The old behaviour was the reverse: hold the gap and pay fewer places,
+        // which is why 50 entries used to pay nine places instead of ten.
+        maxRatio: 3,
 
         // Hard ceiling per place, in dollars. Once a big field pushes a place
         // past its cap the extra does NOT stay with the house: it first tops up

@@ -4,15 +4,15 @@
 // All tunable numbers live in payoutConfig.js. This file is the machinery.
 //
 // How a board is built:
-//   1. purse            = gross revenue x CONFIG.payoutRate
+//   1. purse            = gross revenue x the payout rate for this field size
 //   2. payout model     = entries rounded down (decides how many places pay)
 //   3. active boards    = which of the three boards have unlocked
 //   4. shares           = CONFIG.purseSplit, renormalised over active boards
 //   5. prizes           = each board's slice handed out by weight, rounded down
 //   6. leftovers        = rounding remainder given back out a step at a time
 //
-// Because the purse is fixed up front, the house margin is CONFIG.payoutRate no
-// matter the field size, prizes can never exceed revenue, and prizes can never
+// Because the purse is fixed up front, the house margin lands on target at any
+// field size, prizes can never exceed revenue, and prizes can never
 // invert (weights descend, and every prize in a board rounds to the same step).
 // ---------------------------------------------------------------------------
 
@@ -238,6 +238,46 @@ function distributeSpecialBoard(pool, drawings, milestones, step, floor) {
     return { entries: [], prizes: [] };
 }
 
+// Prize weights spaced evenly from 1st down to last, with 1st worth `ratio`
+// times the last. ratio 1 means every place pays the same.
+function gradedWeights(count, ratio) {
+    if (count <= 1) return [1];
+    return Array.from({ length: count },
+        (_, i) => Math.pow(ratio, (count - 1 - i) / (count - 1)));
+}
+
+// What a set of places costs if the lowest one sits exactly on the floor.
+// Rounded UP to the increment: funding it to the exact penny leaves the lowest
+// place at $449.99999999999994 in floating point, which rounds down to $400,
+// fails the floor check, and silently costs someone their prize.
+function costOfPlaces(count, ratio, floorAmt) {
+    const w = gradedWeights(count, ratio);
+    const exact = (floorAmt * w.reduce((a, b) => a + b, 0)) / Math.min(...w);
+    return roundUpTo(exact, CONFIG.payoutIncrement);
+}
+
+// The widest gap the money can carry while still paying every place at least
+// the floor. Returns null when even equal prizes will not fit.
+function fitRatio(pool, count, floorAmt, maxRatio) {
+    if (costOfPlaces(count, 1, floorAmt) > pool) return null;
+    if (costOfPlaces(count, maxRatio, floorAmt) <= pool) return maxRatio;
+    let lo = 1, hi = maxRatio;
+    for (let i = 0; i < 40; i++) {
+        const mid = (lo + hi) / 2;
+        if (costOfPlaces(count, mid, floorAmt) <= pool) lo = mid; else hi = mid;
+    }
+    return lo;
+}
+
+// Share of revenue paid back to hunters at this field size - see CONFIG.payout.
+function payoutRateFor(entries) {
+    const p = CONFIG.payout;
+    if (entries <= p.smallField) return p.smallRate;
+    if (entries >= p.fullField) return p.fullRate;
+    const progress = (entries - p.smallField) / (p.fullField - p.smallField);
+    return p.smallRate - (p.smallRate - p.fullRate) * progress;
+}
+
 // --- board shape -----------------------------------------------------------
 
 function payoutModel(entries) {
@@ -269,7 +309,8 @@ function unlockedMilestones(model) {
 
 function buildBoard(entries, entryFee) {
     const revenue = entries * entryFee;
-    const purse = revenue * CONFIG.payoutRate;
+    const payoutRate = payoutRateFor(entries);
+    const purse = revenue * payoutRate;
     const model = payoutModel(entries);
 
     const places = topPlacesPaid(model);
@@ -322,6 +363,7 @@ function buildBoard(entries, entryFee) {
     let specialPool = 0;
     // Capped money with nowhere to go, because no other board has unlocked yet.
     let unallocated = 0;
+    let chosenRatio = CONFIG.topTen.maxRatio;
 
     for (let pass = 0; pass < 4; pass++) {
         const activeTotal = Object.keys(active)
@@ -343,16 +385,55 @@ function buildBoard(entries, entryFee) {
         // its lowest place above the floor, and the outside board pays as far
         // down as the remainder reaches. One more hunter is always one more
         // dollar, never a cliff.
-        const topWeights = CONFIG.topTen.weights.slice(0, places);
-        const sumTopWeights = topWeights.reduce((a, b) => a + b, 0);
-        const minTopWeight = Math.min(...topWeights);
-        const needForFloor = (floor * sumTopWeights) / minTopWeight;
+        // Keep the places, fit the gap. Rather than holding a fixed 3:1 spread
+        // and dropping a place when it will not fit, we pay every place the
+        // ladder calls for and use the widest gap the money can carry.
+        // Set the Special Harvest block aside BEFORE the top ten widens its gap,
+        // otherwise the top ten spends the money the block needed and the column
+        // disappears again. Only reserved when the block is affordable once
+        // every top-ten place has its minimum.
+        const blockNeeds = drawings.length
+            ? roundUpTo(floor * CONFIG.specialHarvest.drawings.labels.length, INCREMENT)
+            : 0;
+        const cheapestTopTen = costOfPlaces(places, 1, floor);
+        const blockReserve = (active.specialHarvest && blockNeeds > 0
+            && purse - cheapestTopTen >= blockNeeds) ? blockNeeds : 0;
 
-        const placingsPool = purse * (shareOf('topTen') + shareOf('outsideTopTen'));
+        const placingsPool = Math.min(
+            purse * (shareOf('topTen') + shareOf('outsideTopTen')),
+            purse - blockReserve);
+
+        let paidPlaces = places;
+        let ratio = fitRatio(placingsPool, paidPlaces, floor, CONFIG.topTen.maxRatio);
+        // Only if even equal prizes will not stretch that far do we pay fewer.
+        while (ratio === null && paidPlaces > CONFIG.topTen.minPlaces) {
+            paidPlaces -= 1;
+            ratio = fitRatio(placingsPool, paidPlaces, floor, CONFIG.topTen.maxRatio);
+        }
+        if (ratio === null) ratio = 1;
+
+        const topWeights = gradedWeights(paidPlaces, ratio);
+        chosenRatio = ratio;
+        const needForFloor = costOfPlaces(paidPlaces, ratio, floor);
+
         const topPool = Math.min(
             Math.max(purse * shareOf('topTen'), needForFloor),
             placingsPool);
-        const outsideBase = placingsPool - topPool;
+
+        // Order of the waterfall: top ten, then Special Harvest, then the deep
+        // placings. Special comes second because its block is all-or-nothing -
+        // it either affords four prizes or shows nothing at all - whereas the
+        // outside column can pay however many places the leftovers reach.
+        //
+        // Without this the column flickered: shown at 57-59 entries, gone from
+        // 60 when the outside column opened and took its 31% back, and not seen
+        // again until 87.
+        const afterTopTen = purse - topPool;
+        const specialWanted = purse * shareOf('specialHarvest');
+        const specialFirst = active.specialHarvest
+            ? Math.min(Math.max(specialWanted, blockNeeds), afterTopTen)
+            : 0;
+        const outsideBase = Math.max(0, afterTopTen - specialFirst);
 
         const topStep = stepFor(CONFIG.topTen.rounding, model);
         const uncapped = distributeWithFloor(topPool, topWeights, topStep, floor);
@@ -379,7 +460,7 @@ function buildBoard(entries, entryFee) {
         // Outside stays shut while any top-ten place is unpaid - which now
         // happens naturally, because a short top ten leaves nothing over.
         const outsideOpen = active.outsideTopTen
-            && paidTopCount >= places
+            && paidTopCount >= paidPlaces
             && paidTopCount >= CONFIG.topTen.maxPlaces
             // If 10th is still on the floor there is no legal room beneath it:
             // 11th would have to be below the 2x minimum, which never happens.
@@ -418,9 +499,7 @@ function buildBoard(entries, entryFee) {
         } else {
             perSeat = [];
         }
-        specialPool = active.specialHarvest
-            ? purse * shareOf('specialHarvest') + leftForSpecial
-            : 0;
+        specialPool = active.specialHarvest ? specialFirst + leftForSpecial : 0;
         if (active.specialHarvest) {
             const board = distributeSpecialBoard(
                 specialPool, drawings, milestoneUnits,
@@ -433,15 +512,20 @@ function buildBoard(entries, entryFee) {
             specialPrizes = [];
         }
 
+        // A column that pays nothing must not hold on to its share - the money
+        // belongs to the columns that CAN pay. Re-decided every pass rather than
+        // latched off: with a bigger share a column may become affordable again,
+        // which is what stopped Special Harvest showing at 57 entries and then
+        // vanishing until 87.
         const stillPaying = {
             topTen: true,
-            outsideTopTen: active.outsideTopTen,
+            outsideTopTen: perSeat.some(v => v > 0),
             specialHarvest: specialPrizes.some(v => v > 0),
         };
         if (stillPaying.outsideTopTen === active.outsideTopTen
             && stillPaying.specialHarvest === active.specialHarvest) break;
-        active.outsideTopTen = active.outsideTopTen && stillPaying.outsideTopTen;
-        active.specialHarvest = active.specialHarvest && stillPaying.specialHarvest;
+        active.outsideTopTen = stillPaying.outsideTopTen;
+        active.specialHarvest = stillPaying.specialHarvest;
     }
 
     // Finishing higher must always pay more. The outside-top-10 brackets are a
@@ -497,8 +581,8 @@ function buildBoard(entries, entryFee) {
     // share, so giving the remainder back tightens the intended shape instead of
     // distorting it.
     {
-        const targetPayout = revenue * (1 - CONFIG.marginBand.max);
-        const maxPayout = revenue * (1 - CONFIG.marginBand.min);
+        const targetPayout = revenue * payoutRate;
+        const maxPayout = revenue * (payoutRate + CONFIG.marginFlex);
         const seats = placesPerTier;
 
         const sumOf = () =>
@@ -510,7 +594,7 @@ function buildBoard(entries, entryFee) {
             const total = weights.reduce((a, b) => a + b, 0);
             return prizes.map((_, i) => (total > 0 ? (pool * weights[i]) / total : 0));
         };
-        const topIdeal = idealsFor(topPrizes, CONFIG.topTen.weights.slice(0, places),
+        const topIdeal = idealsFor(topPrizes, gradedWeights(topPrizes.length, chosenRatio),
             topPrizes.reduce((a, b) => a + b, 0));
         const outIdeal = idealsFor(perSeat, tierWeights,
             perSeat.reduce((a, b) => a + b, 0));
