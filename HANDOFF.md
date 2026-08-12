@@ -164,8 +164,17 @@ first; do not iterate on the live home page.
 - Chrome is connected via the Claude in Chrome extension and Chris is logged
   into WP admin. The in-app browser cannot reach localhost or script `file://`.
 
-## Open questions for Chris
+## Settled — do not re-ask
 
-1. New wording for the two column headings.
-2. Whether the deeper places beyond 51st matter on the home page (the board
-   pays 51 places at sellout; smaller bands pay fewer).
+- **The staging redirect to `/?home` does not matter.** The work is on the home
+  page, which renders. `/payout-calculator/` being unreachable is accepted, and
+  PR #1 sitting unmerged is accepted. Neither blocks anything.
+- **Column headings**: Chris will handle the wording himself in Elementor.
+  Leave the heading widgets alone — touch only the rows and their values.
+
+## Scope of the remaining job, precisely
+
+Only the home page (page 52) matters. Render into the existing rows on all
+three responsive copies of the section, wire the ten dropdown bands to
+`buildBoard(band, 225)`, and leave every heading, caption and surrounding
+widget exactly as it is.
