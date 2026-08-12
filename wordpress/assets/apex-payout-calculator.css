@@ -1,0 +1,27 @@
+/* APEX Whitetail Payout Calculator - layout only.
+   Fonts, colours, headings and borders are inherited from the theme.
+   Everything is scoped to #apex-payout-calculator so nothing leaks onto the page. */
+#apex-payout-calculator .payout-info-container,
+#apex-payout-calculator .row-container { display: flex; justify-content: center; }
+#apex-payout-calculator .payout-info { width: 100%; max-width: 1100px; text-align: center; overflow-x: auto; }
+#apex-payout-calculator #apex-payout-nums { margin: 0 auto; border-collapse: collapse; }
+#apex-payout-calculator #apex-payout-nums th { padding: .6em 1.4em .1em; }
+#apex-payout-calculator #apex-payout-nums td { padding: 0 1.4em .3em; font-variant-numeric: tabular-nums; }
+#apex-payout-calculator .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: .5em 2.5em; margin: 1.5em 0 .5em; }
+#apex-payout-calculator .controls form { display: flex; align-items: center; flex-wrap: wrap; gap: .6em; }
+#apex-payout-calculator .controls input { width: 7em; text-align: center; font-variant-numeric: tabular-nums; }
+#apex-payout-calculator .input-error { text-align: center; min-height: 1.4em; margin: .5em 0; }
+#apex-payout-calculator #apex-row { display: flex; flex-wrap: wrap; gap: 1em; justify-content: center; width: 100%; max-width: 1100px; }
+#apex-payout-calculator .leaderboard { flex: 1 1 300px; min-width: 0; max-width: 420px; }
+#apex-payout-calculator .leaderboard-heading { text-align: center; font-weight: 700; }
+#apex-payout-calculator .leaderboard-table { width: 100%; border-collapse: collapse; }
+#apex-payout-calculator .leaderboard-table th,
+#apex-payout-calculator .leaderboard-table td { padding: .35em .6em; }
+#apex-payout-calculator .leaderboard-table th:first-child,
+#apex-payout-calculator .leaderboard-table td:first-child { text-align: left; }
+#apex-payout-calculator .leaderboard-table th:last-child,
+#apex-payout-calculator .leaderboard-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+#apex-payout-calculator .empty-note { text-align: center !important; font-style: italic; padding: 1em .5em !important; }
+/* Semantic, not decorative: a payout above revenue is a loss and must not
+   read like a profit, so this one colour is not left to the theme. */
+#apex-payout-calculator .negative { color: #b00020; }

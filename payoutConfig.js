@@ -121,10 +121,10 @@ const CONFIG = {
         // reads evenly AND holds $165,000.
         //
         // Set to null to remove the ceilings entirely.
-        // No ceiling on the top ten. Special Harvest is capped per prize
-        // instead, so a big field lifts the places hunters actually competed
-        // for rather than piling into the drawings.
-        caps: null,
+        // Ceiling per place. Money over a cap does not stay with the house: it
+        // goes to the places further down, which is what lets the board reach
+        // deeper on a full field.
+        caps: [25000, 22500, 20500, 18500, 16500, 15000, 13500, 12500, 11000, 10000],
 
         // Round each prize down to a tidy number. First matching rule wins.
         // A step wider than the gap between two places merges them, so the
