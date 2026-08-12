@@ -107,8 +107,14 @@ One design question is still open — see "Open questions" at the end.
 - Special Harvest keeps full-width bars in three groups of four:
   points `rgb(161,0,4)`, 100th–400th `rgb(223,19,28)`,
   500th–1250th `rgb(241,72,72)`.
-- Headings still say "TOP TEN SCORES" and "SCORES 11TH - 70TH". Chris is
-  rewording them himself in Elementor — leave the heading widgets alone.
+- Headings **follow the band** (Chris, this session — this supersedes "Chris is
+  rewording them himself in Elementor"). Each column is headed by the places it
+  actually holds: "Scores 1st - 25th" / "Scores 26th - 51st" at a sellout,
+  "Scores 1st - 8th" / "Scores 9th - 15th" at 250 hunters. The page carries two
+  heading widgets per column worded differently on purpose — the large one
+  includes "Scores", the `.text-small` one does not — and each keeps its own
+  style. Reword via `HEADING_LONG` / `HEADING_SHORT` in `apex-home-rewards.js`.
+  Every other heading, including "Special Harvest", is left alone.
 
 `wordpress/rewards-mockup.html` is the approved mockup; regenerate from
 `buildBoard(2500, 225)` if needed. At a sellout the board is 63 prizes: 25 left,

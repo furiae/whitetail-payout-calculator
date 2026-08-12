@@ -44,10 +44,13 @@
  * calculator and the video widget, all of which are on this page and are left
  * untouched. Dequeuing it was considered and rejected.
  *
- * Headings, captions and every other widget are left exactly as they are. Chris
- * is rewording the column headings himself in Elementor. The one caption this
- * does write is .apex_payout_number, "Rewards based on N Hunters", because the
- * plugin's dropdown handler kept it in step and that handler is now gone.
+ * Two things outside the rows are written, and nothing else is:
+ *   - the column headings, which Chris asked to follow the band, because the
+ *     places a column holds change with it - 1st-25th and 26th-51st at a
+ *     sellout, 1st-8th and 9th-15th at 250 hunters;
+ *   - .apex_payout_number, "Rewards based on N Hunters", because the plugin's
+ *     dropdown handler kept that in step and that handler is now gone.
+ * Every other heading, caption and widget is left exactly as it is.
  */
 (function () {
 	'use strict';
@@ -59,10 +62,11 @@
 
 	   Smaller bands pay fewer: 25 places at 500 hunters, 15 at 250, 7 at 50.
 	   Capping the left column at 25 would give those bands nothing to put on
-	   the right, and since the headings are Chris's and are not touched here,
-	   an empty right column would leave its heading standing over a gap. Below
-	   the cap the places are halved instead, so the section stays two columns
-	   at every band. At a sellout this is still exactly 25 | 26.
+	   the right, leaving a lone half-width column beside a gap for six of the
+	   ten bands. Chris chose to halve the places below the cap instead, so the
+	   section stays two columns at every band - 1st-8th | 9th-15th at 250
+	   hunters, 1st-4th | 5th-7th at 50. At a sellout it is still exactly
+	   25 | 26.
 
 	   Set BALANCE_SMALL_BANDS to false to fill the left column to 25 first. */
 	var LEFT_COUNT = 25;
@@ -80,6 +84,20 @@
 	/* Exact ramp read off the live page, so the look is unchanged. */
 	var RED = ['rgb(130,0,4)', 'rgb(162,0,5)', 'rgb(198,28,33)', 'rgb(223,19,28)', 'rgb(239,55,60)'];
 	var GREY = 'rgb(202,202,202)';
+
+	/**
+	 * Column headings, which follow the band.
+	 *
+	 * The page carries two heading widgets per column and they are worded
+	 * differently on purpose: the large one says "Top Ten ScoreS" / "Scores 11th
+	 * - 70th", the `.text-small` one just "TOP TEN" / "11th - 70th". Each keeps
+	 * its own style - whichever template it started closer to is the one it gets
+	 * from then on. {a} and {b} are the first and last place in the column.
+	 *
+	 * Reword these two lines to change the headings; nothing else reads them.
+	 */
+	var HEADING_LONG = 'Scores {a} - {b}';
+	var HEADING_SHORT = '{a} - {b}';
 
 	/**
 	 * Special Harvest: three groups of four, each its own flat colour. The keys
@@ -122,6 +140,34 @@
 		var anc = nodes[0].parentElement;
 		while (anc && !nodes.every(function (n) { return anc.contains(n); })) anc = anc.parentElement;
 		return anc;
+	}
+
+	/**
+	 * The heading widgets belonging to a column. They sit in the same inner
+	 * .elementor-column as its rows, above them, so walking up from the row
+	 * container finds them and nothing else's.
+	 */
+	function headingsFor(host) {
+		var col = host;
+		while (col && !(col.classList && col.classList.contains('elementor-column'))) {
+			col = col.parentElement;
+		}
+		return col ? list(col.querySelectorAll('.elementor-heading-title small')) : [];
+	}
+
+	function setHeadings(host, rows) {
+		if (!rows.length) return;
+		headingsFor(host).forEach(function (el) {
+			/* Decided once, off the wording the page shipped with, so it
+			   survives every later render. */
+			if (!el.getAttribute('data-apex-heading')) {
+				el.setAttribute('data-apex-heading', /scores/i.test(el.textContent) ? 'long' : 'short');
+			}
+			var template = el.getAttribute('data-apex-heading') === 'long' ? HEADING_LONG : HEADING_SHORT;
+			el.textContent = template
+				.replace('{a}', rows[0].label)
+				.replace('{b}', rows[rows.length - 1].label);
+		});
 	}
 
 	/**
@@ -233,6 +279,7 @@
 			paint(widget.querySelector('.progress-con'), rows[i], colourFor(i), barWidth(i, rows.length));
 		});
 
+		setHeadings(col.host, rows);
 	}
 
 	/**
