@@ -113,6 +113,16 @@ That alone switches everything off; the assets can stay.
   (Chris, after seeing them hidden at small bands — he wants the layout he had).
   A field size that does not fund a milestone shows **$0 on a dimmed bar** via
   the plugin's own `dim_down_bar`. Do not go back to hiding them.
+- **Special Harvest wording comes from `SPECIAL_GROUPS`, not the page.** The
+  page's own was inconsistent — "100th Place" and "200th Place" but then bare
+  "300th" and "400th", "1,000 Place" for 1,000th, and "9-Point Harvest Place"
+  sitting in a milestone slot in the free copy. Chris asked for the missing
+  "Place" and for the set to be consistent, so all twelve are written from the
+  view layer. **This overrides Elementor**: rewording one of these rows on the
+  page will not survive the next render — change `SPECIAL_GROUPS`.
+- **Each group is four boxes in every copy.** The free copy's markup has two
+  point-class boxes and six milestone boxes; `fitGroup()` clones short groups up
+  to four and hides the surplus, so all three copies read 4 / 4 / 4.
 - Headings **follow the band** (Chris, this session — this supersedes "Chris is
   rewording them himself in Elementor"). Each column is headed by the places it
   actually holds: "Scores 1st - 25th" / "Scores 26th - 51st" at a sellout,

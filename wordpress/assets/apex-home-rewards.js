@@ -100,14 +100,54 @@
 	var HEADING_SHORT = '{a} - {b}';
 
 	/**
-	 * Special Harvest: three groups of four, each its own flat colour. The keys
-	 * are the engine's row labels, which are also the page's key classes, and
-	 * they are listed in the order the page lays the slots out.
+	 * Special Harvest: three groups of four, each its own flat colour.
+	 *
+	 * `key` is the engine's row label, which is also the page's key class.
+	 * `text` is what the row reads on screen. The slots are listed in the order
+	 * the page lays them out.
+	 *
+	 * The wording is written from here rather than left to the page because the
+	 * page's own was inconsistent - the paid copy read "100th Place" and "200th
+	 * Place" but then just "300th" and "400th", and "1,000 Place" for 1,000th,
+	 * while the free copy had "9-Point Harvest Place" sitting in a milestone
+	 * slot. Chris asked for the missing "Place"; doing it here fixes all three
+	 * copies at once and keeps them from drifting apart again.
+	 *
+	 * The catch, and it is worth knowing: this now OVERRIDES whatever the
+	 * heading text says in Elementor. To reword a Special Harvest row, change it
+	 * here - editing it on the page will not survive the next render.
 	 */
 	var SPECIAL_GROUPS = [
-		{ valueClass: 'progress-content-3', colour: 'rgb(161,0,4)', keys: ['10PT', '9PT', '8PT', '7PT'] },
-		{ valueClass: 'progress-content-4', colour: 'rgb(223,19,28)', keys: ['100th', '200th', '300th', '400th'] },
-		{ valueClass: 'progress-content-5', colour: 'rgb(241,72,72)', keys: ['500th', '750th', '1000th', '1250th'] }
+		{
+			valueClass: 'progress-content-3',
+			colour: 'rgb(161,0,4)',
+			slots: [
+				{ key: '10PT', text: '10-Point Harvest' },
+				{ key: '9PT', text: '9-Point Harvest' },
+				{ key: '8PT', text: '8-Point Harvest' },
+				{ key: '7PT', text: '7-Point Harvest' }
+			]
+		},
+		{
+			valueClass: 'progress-content-4',
+			colour: 'rgb(223,19,28)',
+			slots: [
+				{ key: '100th', text: '100th Place' },
+				{ key: '200th', text: '200th Place' },
+				{ key: '300th', text: '300th Place' },
+				{ key: '400th', text: '400th Place' }
+			]
+		},
+		{
+			valueClass: 'progress-content-5',
+			colour: 'rgb(241,72,72)',
+			slots: [
+				{ key: '500th', text: '500th Place' },
+				{ key: '750th', text: '750th Place' },
+				{ key: '1000th', text: '1,000th Place' },
+				{ key: '1250th', text: '1,250th Place' }
+			]
+		}
 	];
 
 	function money(n) {
@@ -207,12 +247,9 @@
 	 * Repaint one row. `colour` and `width` are supplied because the two
 	 * columns and the three Special Harvest groups compute them differently.
 	 *
-	 * `row.label` is written only where it has to be. The two columns must be
-	 * relabelled - the page says "11th - 15th" where the board now pays 11th -
-	 * but Special Harvest names the same twelve prizes whatever the field size,
-	 * so its wording is the page's own and is left alone. (It is inconsistent:
-	 * the paid copy reads "100th Place" and "200th Place" but then just "300th"
-	 * and "400th". That is copy for Chris to fix in Elementor, not for this.)
+	 * `row.label` is the wording the row reads on screen: the place for the two
+	 * columns, and the text from SPECIAL_GROUPS for Special Harvest. Passing
+	 * null leaves whatever the page says in place; nothing does that any more.
 	 */
 	function paint(con, row, colour, width) {
 		if (!con) return;
@@ -283,8 +320,38 @@
 	}
 
 	/**
-	 * Special Harvest. Every slot the page has is filled, in the order the page
-	 * lays them out; none is ever hidden.
+	 * Bring one Special Harvest group to exactly `want` boxes and return them.
+	 *
+	 * The box is the row's Elementor widget, so growing clones the widget and
+	 * shrinking hides it - the same trick fillColumn uses, and equally safe:
+	 * nothing is removed. A group is only ever short or long in the free copy,
+	 * whose markup was built wrong; the paid one already has four everywhere.
+	 */
+	function fitGroup(rows, want) {
+		var widgetOf = function (con) { return con.parentElement && con.parentElement.parentElement; };
+
+		while (rows.length && rows.length < want) {
+			var last = widgetOf(rows[rows.length - 1]);
+			if (!last) break;
+			var clone = last.cloneNode(true);
+			clone.removeAttribute('data-id');
+			last.parentNode.insertBefore(clone, last.nextSibling);
+			rows.push(clone.querySelector('.progress-con'));
+		}
+
+		rows.forEach(function (con, i) {
+			var widget = widgetOf(con);
+			var show = i < want;
+			if (widget) widget.style.display = show ? '' : 'none';
+			con.style.display = show ? '' : 'none';
+		});
+
+		return rows.slice(0, want);
+	}
+
+	/**
+	 * Special Harvest. Twelve boxes, four to a group, in every copy of the
+	 * section; only the figures change with the band.
 	 */
 	function fillSpecial(section, specialRows) {
 		var byLabel = {};
@@ -294,24 +361,28 @@
 			var rows = rowsWith(section, group.valueClass);
 			if (!rows.length) return;
 
+			/* Every group is four boxes in every copy. The paid section already
+			   is; the free one (fe96e71) is not - its markup has two point-class
+			   boxes and six for the four 100th-400th milestones. Short groups
+			   are grown by cloning the last box, surplus ones are hidden, so all
+			   three copies read the same. */
+			rows = fitGroup(rows, group.slots.length);
+
 			/* All twelve boxes always show and only the figures change - Chris's
 			   call, and how the page behaved before any of this. A field size
 			   that does not fund a milestone shows $0 on a dimmed bar, which is
 			   what dim_down_bar is for and what the plugin used to do.
 
-			   Slot i takes the prize named by key i, so a figure always sits
-			   beside the prize it belongs to. `label: null` leaves the page's
-			   own wording in place. */
+			   Slot i takes the prize named by slot i, so a figure always sits
+			   beside the prize it belongs to. A copy with more slots than there
+			   are prizes - fe96e71 has six for the four 100th-400th milestones
+			   - leaves the surplus blank at $0. */
 			rows.forEach(function (con, i) {
-				var widget = con.parentElement && con.parentElement.parentElement;
-				var prize = byLabel[group.keys[i]];
+				var slot = group.slots[i];
+				var prize = byLabel[slot.key];
 				var amount = prize ? prize.amount : 0;
 
-				/* Nothing here is ever hidden. */
-				if (widget) widget.style.display = '';
-				con.style.display = '';
-
-				paint(con, { label: null, amount: amount }, group.colour, 100);
+				paint(con, { label: slot.text, amount: amount }, group.colour, 100);
 				if (!amount) con.classList.add('dim_down_bar');
 			});
 		});

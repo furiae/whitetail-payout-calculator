@@ -30,7 +30,7 @@ function apex_payout_calculator_enqueue() {
 	}
 
 	$dir = get_stylesheet_directory_uri() . '/assets/';
-	$ver = '1.0.3';
+	$ver = '1.0.5';
 
 	/* Restores the bar's height, which the view layer takes away when it drops
 	   the plugin's progress_bar_animate class to set its own tapered width. */
