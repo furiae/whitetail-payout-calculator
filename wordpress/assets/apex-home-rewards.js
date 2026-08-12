@@ -56,26 +56,11 @@
 	 * An existing row is cloned so the markup - and therefore the styling and
 	 * the progress-bar animation - is exactly what the page already uses.
 	 */
-	function renderOutside(column, rows) {
-		var template = column.querySelector('.progress-con');
+	function renderOutside(host, rows) {
+		var template = host.__apexTemplate;
 		if (!template) return;
 
-		var blank = template.cloneNode(true);
-		var host = column.querySelector('.' + SPLIT_CLASS);
-		if (!host) {
-			host = document.createElement('div');
-			host.className = SPLIT_CLASS;
-			host.style.display = 'flex';
-			host.style.flexWrap = 'wrap';
-			host.style.gap = '0 2em';
-			template.parentNode.insertBefore(host, template);
-		}
 		host.innerHTML = '';
-
-		// No places outside the top ten at this field size - leave nothing behind.
-		[].slice.call(column.querySelectorAll('.progress-con')).forEach(function (el) {
-			if (!host.contains(el)) el.parentNode.removeChild(el);
-		});
 		if (!rows.length) {
 			host.style.display = 'none';
 			return;
@@ -83,16 +68,14 @@
 		host.style.display = 'flex';
 
 		// 51 places read as 25 and 26; a shorter list still splits evenly.
-		var left = Math.floor(rows.length / 2);
-		var columns = [rows.slice(0, left), rows.slice(left)];
-
-		columns.forEach(function (set) {
+		var left = Math.ceil(rows.length / 2);
+		[rows.slice(0, left), rows.slice(left)].forEach(function (set) {
 			if (!set.length) return;
 			var col = document.createElement('div');
 			col.style.flex = '1 1 45%';
 			col.style.minWidth = '0';
 			set.forEach(function (row) {
-				var node = blank.cloneNode(true);
+				var node = template.cloneNode(true);
 				var label = node.querySelector('span');
 				var value = node.querySelector('[class*="progress-content"]');
 				if (label) label.textContent = row.label;
@@ -104,6 +87,35 @@
 			});
 			host.appendChild(col);
 		});
+	}
+
+	/**
+	 * The containers holding the outside rows - and ONLY those.
+	 *
+	 * Selecting by .elementor-column matched an outer nested column that also
+	 * contained the top ten, and wiped it. Derive the container from the rows
+	 * themselves instead: the direct parent of a .progress-con that holds a
+	 * .progress-content-2. Marked on first pass so it can be found again once
+	 * the original rows have been replaced.
+	 */
+	function outsideHosts() {
+		[].slice.call(document.querySelectorAll('.progress-content-2')).forEach(function (v) {
+			var con = v.closest ? v.closest('.progress-con') : null;
+			var parent = con && con.parentElement;
+			if (!parent || parent.hasAttribute('data-apex-outside')) return;
+			parent.setAttribute('data-apex-outside', '1');
+			var split = document.createElement('div');
+			split.className = SPLIT_CLASS;
+			split.style.display = 'flex';
+			split.style.flexWrap = 'wrap';
+			split.style.gap = '0 2em';
+			split.__apexTemplate = con.cloneNode(true);
+			[].slice.call(parent.querySelectorAll('.progress-con')).forEach(function (el) {
+				el.parentNode.removeChild(el);
+			});
+			parent.appendChild(split);
+		});
+		return [].slice.call(document.querySelectorAll('.' + SPLIT_CLASS));
 	}
 
 	function render(entries) {
@@ -133,11 +145,7 @@
 			});
 
 		// Outside the top ten, one row per place, in two columns.
-		[].slice.call(document.querySelectorAll('.elementor-column'))
-			.filter(function (col) {
-				return col.querySelector('.progress-content-2') || col.querySelector('.' + SPLIT_CLASS);
-			})
-			.forEach(function (col) { renderOutside(col, board.outsideRows); });
+		outsideHosts().forEach(function (host) { renderOutside(host, board.outsideRows); });
 	}
 
 	function selectedBand() {
