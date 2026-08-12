@@ -69,10 +69,15 @@ In `wp-content/themes/astra-child-theme/`:
 - `assets/apex-payout-calculator.js` — the engine, plus a one-line
   `window.ApexPayouts = { buildBoard }` export.
 - `assets/apex-payout-calculator.css` — layout only; Astra supplies the rest.
-- `assets/apex-home-rewards.js` — home page view layer, 15,078 bytes. **Live.**
-- `assets/apex-home-rewards.css` — restores the bar's height, 1,416 bytes.
+- `assets/apex-home-rewards.js` — home page view layer, 17,315 bytes. **Live.**
+- `assets/apex-home-rewards.css` — restores the bar's height, 1,547 bytes.
   **Live**, and the view layer is broken without it.
-- `apex-payout-calculator.php` — enqueue file, 1,570 bytes. **Live.**
+- `apex-payout-calculator.php` — enqueue file, 1,570 bytes, `$ver` 1.0.6.
+  **Live.**
+
+Every one of these was verified by SHA-256 against the repo after writing. The
+figures above are the state at the end of the session that deployed them; check
+them rather than trusting them.
 
 `functions.php` is 36,371 bytes: the original 36,141 untouched, plus the
 `require_once` block at the end. That block is the on/off switch — delete it and
@@ -204,9 +209,19 @@ Band dropdown: `ul.new-dropdown-payout span` shows the current value,
 calculator and the video widget — all present on the home page. Dequeuing it
 breaks score submission.
 
-It binds the band dropdown **directly** to the list items, not delegated, so
-`jQuery('ul.show-click-btm li').off('click')` removes that one handler and
-leaves everything else alone. That is the approach.
+It binds the band dropdown **directly** to the list items, not delegated. The
+`.off('click')` is kept, but it is **not sufficient on its own**: the plugin
+binds inside `jQuery(document).ready()`, and if the view layer gets there first
+the `.off()` removes nothing and the plugin binds afterwards. Until the
+re-attach on window load, a hunter clicking a band in that window gets the old
+hardcoded figures — $2,250 for 1st at 250 hunters rather than $4,450. It was
+seen happening on staging.
+
+So the click is taken on `document` in the **capture phase**, which always runs
+before a handler bound to the list item itself, whenever it was bound, and
+`stopPropagation()` means the plugin's handler never sees it. `home-test.js`
+covers this by binding a saboteur *after* the view layer and asserting it never
+gets to run.
 
 Two other things in that file matter:
 
@@ -300,12 +315,33 @@ widget exactly as it is.
   both give exactly 25 | 26.
 - **Headings follow the band**, per Chris this session. See the design section.
 
+## Writing files through File Manager
+
+Two things cost an hour between them, both worth knowing:
+
+- `cmd:'open'` **is aborted by elFinder's own auto-sync**, so a walk built on it
+  fails with `openabort` at random. Use `cmd:'ls'` instead — it is not queued
+  the same way and returns everything needed.
+- **`ls` returns `{hash: name}`, not `{name: hash}`.** Indexing it by name gives
+  `undefined`, and a write with `target: undefined` fails as
+  `{"error":["errCmdParams","put"]}` — which reads exactly like a rejected
+  payload and sent one session chasing an imaginary size limit. Invert the map.
+
+`cmd:'put'` handles a whole file happily at these sizes. For anything large the
+multipart `cmd:'upload'` route works too (FormData with `upload[]`, `target` set
+to the *directory* hash, plus `fm.options.customData`) — but the firewall
+refuses `.php` that way, so PHP has to go through `put`.
+
+The most reliable way to get file contents into the browser is to push to GitHub
+first and `fetch()` a **commit-pinned** raw URL: pinned URLs are immutable, so
+the stale-copy problem does not apply, and there is no giant payload to paste.
+
 ## Bumping the asset version matters
 
 `$ver` in `apex-payout-calculator.php` is the cache key on every `?ver=` query
 string. Overwriting an asset without bumping it leaves every browser — including
 yours while testing — running the old file, which looks exactly like a fix that
-did not work. It is at **1.0.3**. Bump it on every asset change.
+did not work. It is at **1.0.6**. Bump it on every asset change.
 
 ## Still open
 

@@ -414,25 +414,48 @@
 		return isNaN(n) ? 2500 : n;
 	}
 
+	/**
+	 * Take the band dropdown off the plugin, once, for good.
+	 *
+	 * Removing the plugin's handler with .off('click') is not enough on its own:
+	 * the plugin binds inside jQuery(document).ready(), and if this script gets
+	 * there first the .off() removes nothing and the plugin binds afterwards.
+	 * Until the re-attach on window load, a hunter clicking a band in that
+	 * window would get the old hardcoded figures - $2,250 for 1st at 250 rather
+	 * than the $4,450 the current rules pay.
+	 *
+	 * So the click is taken on `document` in the CAPTURE phase, which always
+	 * runs before any handler bound to the list item itself, whenever it was
+	 * bound. stopPropagation then means the plugin's handler never sees it. The
+	 * .off() below stays as well; belt and braces, and it keeps the DOM clean.
+	 */
+	function seizeDropdown() {
+		if (document.documentElement.hasAttribute('data-apex-dropdown')) return;
+		document.documentElement.setAttribute('data-apex-dropdown', '1');
+
+		document.addEventListener('click', function (e) {
+			var li = e.target && e.target.closest ? e.target.closest('ul.show-click-btm li') : null;
+			if (!li) return;
+
+			e.preventDefault();
+			e.stopPropagation();
+
+			var value = li.textContent.trim();
+			var shown = document.querySelector('ul.new-dropdown-payout span');
+			if (shown) shown.textContent = value;
+			if (li.parentNode) li.parentNode.style.display = 'none';
+			render(parseInt(value.replace(/[^\d]/g, ''), 10));
+		}, true);
+	}
+
 	function attach() {
 		if (!window.ApexPayouts) return false;
 		if (!document.querySelector('.elementor-top-section.payout-calculator')) return false;
 
+		seizeDropdown();
+
 		var options = document.querySelectorAll('ul.show-click-btm li');
 		if (window.jQuery && options.length) window.jQuery(options).off('click');
-
-		list(options).forEach(function (li) {
-			if (li.getAttribute('data-apex-bound') === '1') return;
-			li.setAttribute('data-apex-bound', '1');
-			li.addEventListener('click', function (e) {
-				e.preventDefault();
-				var value = li.textContent.trim();
-				var shown = document.querySelector('ul.new-dropdown-payout span');
-				if (shown) shown.textContent = value;
-				if (li.parentNode) li.parentNode.style.display = 'none';
-				render(parseInt(value.replace(/[^\d]/g, ''), 10));
-			});
-		});
 
 		render(selectedBand());
 		return true;
