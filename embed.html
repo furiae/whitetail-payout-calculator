@@ -1,7 +1,5 @@
 <!-- APEX Whitetail Payout Calculator - paste into a Custom HTML block.
-     Self-contained: all styles are scoped to #apex-payout-calculator and the
-     script runs in its own closure, so nothing here can affect the rest
-     of the page. -->
+     Inherits the site's fonts, colours and headings; only layout is styled here. -->
 <div id="apex-payout-calculator">
 <h1>APEX Whitetail Challenge<br>
     Payout Calculator</h1>
@@ -96,295 +94,38 @@
 </div>
 
 <style>
-/* ---------------------------------------------------------------------------
-   APEX Whitetail Challenge - payout calculator
+/* Layout only - colours, fonts and sizing are inherited from the site.
+   Everything is scoped to #apex-payout-calculator so nothing leaks out. */
+#apex-payout-calculator .payout-info-container,
+#apex-payout-calculator .row-container { display: flex; justify-content: center; }
 
-   The page background is left transparent on purpose: this page is embedded in
-   another site, so the host page supplies the backdrop. Everything here styles
-   the panels, which are dark with light text so they read well on either a
-   light or a dark host page.
-   --------------------------------------------------------------------------- */
+#apex-payout-calculator .payout-info { width: 100%; max-width: 1100px; text-align: center; overflow-x: auto; }
+#apex-payout-calculator #apex-payout-nums { margin: 0 auto; border-collapse: collapse; }
+#apex-payout-calculator #apex-payout-nums th { padding: .6em 1.4em .1em; }
+#apex-payout-calculator #apex-payout-nums td { padding: 0 1.4em .3em; font-variant-numeric: tabular-nums; }
 
-#apex-payout-calculator another site, #apex-payout-calculator the panels, #apex-payout-calculator {
-    --panel: #23282a;
-    --panel-edge: #3a4145;
-    --panel-alt: #2b3134;
-    --ink: #f2efe9;
-    --ink-dim: #a9b0b3;
-    --accent: #c8922f;
-    --accent-soft: rgba(200, 146, 47, 0.14);
-    --good: #7fb069;
-    --bad: #d9534f;
-    --radius: 14px;
-}
+#apex-payout-calculator .controls { display: flex; flex-wrap: wrap; justify-content: center;
+    gap: .5em 2.5em; margin: 1.5em 0 .5em; }
+#apex-payout-calculator .controls form { display: flex; align-items: center; flex-wrap: wrap; gap: .6em; }
+#apex-payout-calculator .controls input { width: 7em; text-align: center; font-variant-numeric: tabular-nums; }
+#apex-payout-calculator .input-error { text-align: center; min-height: 1.4em; margin: .5em 0; }
 
+#apex-payout-calculator #apex-row { display: flex; flex-wrap: wrap; gap: 1em;
+    justify-content: center; width: 100%; max-width: 1100px; }
+#apex-payout-calculator .leaderboard { flex: 1 1 300px; min-width: 0; max-width: 420px; }
+#apex-payout-calculator .leaderboard-heading { text-align: center; font-weight: 700; }
+#apex-payout-calculator .leaderboard-table { width: 100%; border-collapse: collapse; }
+#apex-payout-calculator .leaderboard-table th,
+#apex-payout-calculator .leaderboard-table td { padding: .35em .6em; }
+#apex-payout-calculator .leaderboard-table th:first-child,
+#apex-payout-calculator .leaderboard-table td:first-child { text-align: left; }
+#apex-payout-calculator .leaderboard-table th:last-child,
+#apex-payout-calculator .leaderboard-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+#apex-payout-calculator .empty-note { text-align: center !important; font-style: italic; padding: 1em .5em !important; }
 
-#apex-payout-calculator {
-    margin: 0 0 100px;
-    background-color: transparent;
-    font-family: "Helvetica Neue", Arial, sans-serif;
-    color: var(--ink);
-    -webkit-text-size-adjust: 100%;
-}
-
-
-#apex-payout-calculator h1 {
-    text-align: center;
-    font-size: clamp(1.9rem, 6vw, 4rem);
-    line-height: 1.1;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    margin: 0.6em 0.4em 0.5em;
-    color: var(--ink);
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-}
-
-
-/* --- summary panel -------------------------------------------------------- */
-
-#apex-payout-calculator .payout-info-container {
-    display: flex;
-    justify-content: center;
-    padding: 0 1rem;
-}
-
-
-#apex-payout-calculator .payout-info {
-    width: 100%;
-    /* Was min-width: 1250px, which shoved this panel off the left edge of any
-       narrower screen with no way to scroll it back into view. */
-    max-width: 1100px;
-    background: var(--panel);
-    border: 1px solid var(--panel-edge);
-    border-radius: var(--radius);
-    padding: 1.5rem 1rem 1.75rem;
-    text-align: center;
-    overflow-x: auto;
-}
-
-
-#apex-payout-calculator #apex-payout-nums {
-    margin: 0 auto;
-    border-collapse: collapse;
-}
-
-
-#apex-payout-calculator #apex-payout-nums th {
-    font-size: clamp(0.7rem, 1.6vw, 0.85rem);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: var(--ink-dim);
-    padding: 0.9rem 1.75rem 0.2rem;
-}
-
-
-#apex-payout-calculator #apex-payout-nums td {
-    font-size: clamp(1.1rem, 3.2vw, 1.9rem);
-    font-weight: 600;
-    padding: 0 1.75rem 0.4rem;
-    font-variant-numeric: tabular-nums;
-}
-
-
-#apex-payout-calculator .payout-info h3 {
-    font-size: clamp(0.75rem, 1.8vw, 0.95rem);
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: var(--ink-dim);
-    margin: 1.4rem 0 0.3rem;
-}
-
-
-#apex-payout-calculator .payout-info h4 {
-    font-size: clamp(1.6rem, 5vw, 2.6rem);
-    font-weight: 700;
-    color: var(--good);
-    margin: 0;
-    font-variant-numeric: tabular-nums;
-}
-
-
-/* A payout larger than revenue is a loss - never show it in the "profit" green. */
-#apex-payout-calculator .negative {
-    color: var(--bad);
-}
-
-
-/* --- inputs --------------------------------------------------------------- */
-
-#apex-payout-calculator .controls {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem 2.5rem;
-    margin: 2rem 1rem 0;
-}
-
-
-#apex-payout-calculator form {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.75rem;
-}
-
-
-#apex-payout-calculator label {
-    font-size: clamp(0.75rem, 2vw, 0.95rem);
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: var(--ink-dim);
-}
-
-
-#apex-payout-calculator input {
-    font-size: clamp(1rem, 3vw, 1.35rem);
-    font-weight: 600;
-    width: 7.5rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 10px;
-    border: 1px solid var(--panel-edge);
-    background: var(--panel-alt);
-    color: var(--ink);
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-}
-
-
-#apex-payout-calculator input:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
-
-/* These used to be hidden on every screen wider than 500px, leaving desktop
-   users no way to recalculate except guessing that Enter worked. */
-#apex-payout-calculator /* These used to be hidden on every screen wider than 500px, #apex-payout-calculator button {
-    font-size: clamp(0.75rem, 2vw, 0.9rem);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    font-weight: 700;
-    padding: 0.6rem 1.25rem;
-    border-radius: 10px;
-    border: 1px solid var(--accent);
-    background: var(--accent-soft);
-    color: var(--accent);
-    cursor: pointer;
-}
-
-
-#apex-payout-calculator button:hover {
-    background: var(--accent);
-    color: #1b1f21;
-}
-
-
-#apex-payout-calculator .input-error {
-    text-align: center;
-    font-size: 0.95rem;
-    color: var(--bad);
-    margin: 1rem 1rem 0;
-    min-height: 1.4em;
-}
-
-
-/* --- prize boards --------------------------------------------------------- */
-
-#apex-payout-calculator .row-container {
-    display: flex;
-    justify-content: center;
-    padding: 0 1rem;
-}
-
-
-#apex-payout-calculator #apex-row {
-    width: 100%;
-    max-width: 1100px;
-    display: flex;
-    /* Wrap rather than overflow: three fixed-width cards do not fit a phone or
-       a narrow embed column. */
-    flex-wrap: wrap;
-    gap: 1rem;
-    justify-content: center;
-    margin: 1.5rem auto 0;
-}
-
-
-#apex-payout-calculator .leaderboard {
-    flex: 1 1 300px;
-    min-width: 0;
-    max-width: 420px;
-    background: var(--panel);
-    border: 1px solid var(--panel-edge);
-    border-radius: var(--radius);
-    padding: 0 0 1rem;
-    overflow: hidden;
-}
-
-
-#apex-payout-calculator .leaderboard-heading {
-    text-align: center;
-    font-size: 0.85rem;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    font-weight: 700;
-    color: var(--accent);
-    background: var(--accent-soft);
-    margin: 0 0 0.5rem;
-    padding: 0.9rem 0.5rem;
-}
-
-
-#apex-payout-calculator .leaderboard-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-
-#apex-payout-calculator .leaderboard-table th {
-    font-size: 0.7rem;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: var(--ink-dim);
-    padding: 0.4rem 1.1rem 0.6rem;
-}
-
-
-.leaderboard-table th:first-child,
-#apex-payout-calculator .leaderboard-table th:first-child, #apex-payout-calculator .leaderboard-table td:first-child {
-    text-align: left;
-}
-
-
-.leaderboard-table th:last-child,
-#apex-payout-calculator .leaderboard-table th:last-child, #apex-payout-calculator .leaderboard-table td:last-child {
-    text-align: right;
-}
-
-
-#apex-payout-calculator .leaderboard-table td {
-    font-size: clamp(0.95rem, 2.4vw, 1.05rem);
-    padding: 0.45rem 1.1rem;
-    font-variant-numeric: tabular-nums;
-}
-
-
-#apex-payout-calculator .leaderboard-table tbody tr:nth-child(odd) {
-    background: rgba(255, 255, 255, 0.03);
-}
-
-
-#apex-payout-calculator .empty-note {
-    text-align: center !important;
-    color: var(--ink-dim);
-    font-style: italic;
-    padding: 1.25rem 1rem !important;
-}
+/* Kept because it carries meaning rather than decoration: a payout larger than
+   revenue is a loss, and must not read like a profit. */
+#apex-payout-calculator .negative { color: #b00020; }
 </style>
 
 <script>
