@@ -30,7 +30,16 @@ function apex_payout_calculator_enqueue() {
 	}
 
 	$dir = get_stylesheet_directory_uri() . '/assets/';
-	$ver = '1.0.1';
+	$ver = '1.0.2';
+
+	/* Restores the bar's height, which the view layer takes away when it drops
+	   the plugin's progress_bar_animate class to set its own tapered width. */
+	wp_enqueue_style(
+		'apex-home-rewards',
+		$dir . 'apex-home-rewards.css',
+		array(),
+		$ver
+	);
 
 	wp_enqueue_script(
 		'apex-payout-engine',

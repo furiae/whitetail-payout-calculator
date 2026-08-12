@@ -1,0 +1,30 @@
+/**
+ * APEX home page Rewards Calculator (page 52) - the little the view layer needs.
+ *
+ * Everything else about the section is left to the plugin's own stylesheet:
+ * apex-competitions-controller/assets/css/elementor.css lays the rows out, and
+ * the right column is already mirrored there (.progress-2 floats right and
+ * justifies to flex-end, .progress-content-2 floats left).
+ *
+ * What that stylesheet does NOT give us is a bar. Every original row has its own
+ * compound rule - .progress-value-6-a.progress_bar_animate.progress_bar and
+ * eleven more like it - each pinning width to 0 and animating to one fixed per
+ * cent. The view layer drops the progress_bar_animate class so it can set the
+ * tapered width itself, and that takes height: 40px away with it. There is no
+ * bare .progress_bar rule anywhere, so without the height below the bar
+ * collapses to nothing and the section renders empty.
+ */
+
+.progress-con .progress_bar.apex-bar {
+	height: 40px;
+	/* A flex child of a 40px track: take the inline width, do not be squeezed. */
+	flex: none;
+	/* Stands in for the per-row load-N keyframes the animate class carried. */
+	transition: width 0.9s ease-out, background-color 0.2s linear;
+}
+
+/* Rows the current field size does not pay are hidden outright rather than
+   dimmed, so the plugin's dimming never applies to a live row. */
+.progress-con.dim_down_bar .progress_bar.apex-bar {
+	opacity: 1;
+}
