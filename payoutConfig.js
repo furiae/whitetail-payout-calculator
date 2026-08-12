@@ -33,6 +33,18 @@ const CONFIG = {
     // hand it back rather than quietly keep it.
     marginFlex: 0.02,
 
+    // Smallest allowed step between two finishing places, 1st through 75th.
+    // Prizes still land on payoutIncrement, but neighbouring places must differ
+    // by at least this, so the board never reads as a run of near-identical
+    // figures.
+    //
+    // Not free: a wider minimum step makes each extra place cost more, so fewer
+    // places fit the same purse.
+    //
+    // Does not apply to Special Harvest - the four point classes are meant to
+    // be equal to each other.
+    minPlaceGap: 100,
+
     // Every prize lands on a whole multiple of this. No $510, no $225.
     // Caps and floors are snapped to it too, so nothing can sneak past.
     payoutIncrement: 50,

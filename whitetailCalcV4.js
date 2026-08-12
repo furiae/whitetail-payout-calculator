@@ -72,6 +72,8 @@ function ordinal(n) {
 // Every prize is a whole multiple of this, so the only legal step sizes are its
 // multiples. Coarser steps make a rounder-looking board; finer steps waste less.
 const INCREMENT = CONFIG.payoutIncrement;
+// Minimum step between neighbouring finishing places (see CONFIG.minPlaceGap).
+const MIN_GAP = Math.max(CONFIG.minPlaceGap || INCREMENT, INCREMENT);
 const STEP_LADDER = [1000, 500, 250, 100, 50, 25, 10, 5, 1]
     .filter(step => step % INCREMENT === 0 && step >= INCREMENT);
 
@@ -130,7 +132,7 @@ function distribute(pool, weights, maxStep, seats, strict) {
             // figure. Special Harvest passes strict = false, because the four
             // point classes are deliberately equal.
             if (k > 0) {
-                const room = strict ? prizes[k - 1] - step : prizes[k - 1];
+                const room = strict ? prizes[k - 1] - MIN_GAP : prizes[k - 1];
                 if (prizes[k] + step > room) continue;
             }
             prizes[k] += step;
@@ -150,6 +152,20 @@ function distribute(pool, weights, maxStep, seats, strict) {
 function distributeWithFloor(pool, weights, maxStep, floor, strict) {
     for (let count = weights.length; count >= 1; count--) {
         const prizes = distribute(pool, weights.slice(0, count), maxStep, null, strict);
+
+        // Force the minimum step between places. Rounding to the $50 grid can
+        // land two places on the same figure, or $50 apart, before the leftover
+        // pass ever runs - so walk the ladder and hold each place at least
+        // MIN_GAP below the one above. Anything that falls under the floor as a
+        // result fails the check below and the count drops by one.
+        if (strict) {
+            let rung = Infinity;
+            for (let i = 0; i < prizes.length; i++) {
+                prizes[i] = Math.min(prizes[i], rung);
+                rung = prizes[i] - MIN_GAP;
+            }
+        }
+
         if (prizes[count - 1] >= floor) {
             return prizes.concat(new Array(weights.length - count).fill(0));
         }
@@ -471,10 +487,10 @@ function buildBoard(entries, entryFee) {
         // ten. The placings keep the money; the drawings only ever get their
         // own share.
         const firstPaid = firstPass.prizes.filter(v => v > 0);
-        let rung = firstPaid.length ? Math.min(...firstPaid) - INCREMENT : 0;
+        let rung = firstPaid.length ? Math.min(...firstPaid) - MIN_GAP : 0;
         let outsideCapacity = 0;
         for (let seats = 0; rung >= floor && seats < CONFIG.outsideTopTen.maxTiers;
-             rung -= INCREMENT, seats++) {
+             rung -= MIN_GAP, seats++) {
             outsideCapacity += rung;
         }
 
@@ -513,7 +529,7 @@ function buildBoard(entries, entryFee) {
         // clears the floor by an increment, which is exactly right - a board
         // showing 10th through 20th all on the same figure helps nobody.
         const outsideCeilingNow = paidTopCount
-            ? Math.min(...topPrizes.filter(v => v > 0)) - INCREMENT
+            ? Math.min(...topPrizes.filter(v => v > 0)) - MIN_GAP
             : Infinity;
         // Outside stays shut while any top-ten place is unpaid - which now
         // happens naturally, because a short top ten leaves nothing over.
@@ -537,7 +553,7 @@ function buildBoard(entries, entryFee) {
             // which is the floor - leaving exactly one legal value. Paying ten
             // places there put $450 against every one of 11th through 20th.
             const roomForDistinct = Math.max(1,
-                Math.floor((outsideCeilingNow - floor) / INCREMENT) + 1);
+                Math.floor((outsideCeilingNow - floor) / MIN_GAP) + 1);
             const outsideMaxRatio = Math.max(1, outsideCeilingNow / floor);
 
             // How many places the money can actually carry. Every place must be
@@ -548,7 +564,7 @@ function buildBoard(entries, entryFee) {
             // $5,000 pool; the descent then had nowhere to put nine of them and
             // zeroed them, so 200 entries paid two hunters outside the top ten
             // while $5,000 sat unspent. The ladder cost is what decides it now.
-            const ladderCost = k => k * floor + INCREMENT * (k * (k - 1)) / 2;
+            const ladderCost = k => k * floor + MIN_GAP * (k * (k - 1)) / 2;
             let count = Math.min(tiers, CONFIG.outsideTopTen.maxTiers, roomForDistinct);
             while (count > 1 && ladderCost(count) > outsidePool) count -= 1;
 
@@ -568,7 +584,7 @@ function buildBoard(entries, entryFee) {
             let rung = outsideCeilingNow;
             const clamped = result.map(v => {
                 const amount = Math.min(v, rung);
-                rung = amount - INCREMENT;
+                rung = amount - MIN_GAP;
                 return amount < floor ? 0 : amount;
             });
             leftForSpecial = (result.reduce((a, b) => a + b, 0)
@@ -684,7 +700,7 @@ function buildBoard(entries, entryFee) {
         let payout = sumOf();
         for (let guard = 0; guard < 400 && payout < targetPayout; guard++) {
             const paidTopNow = topPrizes.filter(v => v > 0);
-            const outsideCeiling = paidTopNow.length ? Math.min(...paidTopNow) - INCREMENT : Infinity;
+            const outsideCeiling = paidTopNow.length ? Math.min(...paidTopNow) - MIN_GAP : Infinity;
             const candidates = [];
 
             // limit = the highest this prize may legally reach.
@@ -693,13 +709,13 @@ function buildBoard(entries, entryFee) {
                 const cap = CONFIG.topTen.caps ? CONFIG.topTen.caps[i] : Infinity;
                 // Stop one increment short of the place above: handing money back
                 // must not flatten the ladder into a run of identical prizes.
-                const limit = Math.min(cap, i > 0 ? topPrizes[i - 1] - INCREMENT : Infinity);
+                const limit = Math.min(cap, i > 0 ? topPrizes[i - 1] - MIN_GAP : Infinity);
                 candidates.push({ v, limit, cost: INCREMENT, deficit: topIdeal[i] - v,
                     bump: k => { topPrizes[i] += k * INCREMENT; } });
             });
             perSeat.forEach((v, i) => {
                 if (v <= 0) return;
-                const limit = Math.min(outsideCeiling, i > 0 ? perSeat[i - 1] - INCREMENT : Infinity);
+                const limit = Math.min(outsideCeiling, i > 0 ? perSeat[i - 1] - MIN_GAP : Infinity);
                 candidates.push({ v, limit, cost: INCREMENT * seats, deficit: outIdeal[i] - v,
                     bump: k => { perSeat[i] += k * INCREMENT; } });
             });
