@@ -95,8 +95,8 @@ Chris approved a mockup; build to match it exactly.
 - Special Harvest keeps full-width bars in three groups of four:
   points `rgb(161,0,4)`, 100th–400th `rgb(223,19,28)`,
   500th–1250th `rgb(241,72,72)`.
-- Headings still say "TOP TEN SCORES" and "SCORES 11TH - 70TH" and will need
-  rewording. **Chris has not chosen the new wording — ask.**
+- Headings still say "TOP TEN SCORES" and "SCORES 11TH - 70TH". Chris is
+  rewording them himself in Elementor — leave the heading widgets alone.
 
 The mockup generator is in the scratchpad session log; regenerate from
 `buildBoard(2500, 225)` if needed.
