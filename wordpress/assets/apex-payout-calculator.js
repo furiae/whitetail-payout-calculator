@@ -1108,5 +1108,7 @@ if (entriesForm) {
 
 // Exported for the Node test harness; ignored by the browser.
 
-
+// Narrow export so other pages can render the same board without duplicating
+// any of the rules. Nothing else escapes the closure.
+window.ApexPayouts = { buildBoard: buildBoard, entryFee: 225 };
 })();
