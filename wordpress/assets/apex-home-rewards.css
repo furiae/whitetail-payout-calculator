@@ -23,8 +23,8 @@
 	transition: width 0.9s ease-out, background-color 0.2s linear;
 }
 
-/* Rows the current field size does not pay are hidden outright rather than
-   dimmed, so the plugin's dimming never applies to a live row. */
-.progress-con.dim_down_bar .progress_bar.apex-bar {
-	opacity: 1;
-}
+/* A Special Harvest prize this field size does not fund still shows its box, at
+   $0 on a dimmed bar. The dimming itself is the plugin's: elementor.css fades
+   .dim_down_bar .progress-3/-4/-5, the wrapper rather than the bar. Nothing is
+   needed here for it - this comment is so the next person does not add a rule
+   that fights it. */

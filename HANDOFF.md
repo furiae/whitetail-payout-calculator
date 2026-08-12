@@ -109,6 +109,10 @@ That alone switches everything off; the assets can stay.
 - Special Harvest keeps full-width bars in three groups of four:
   points `rgb(161,0,4)`, 100th–400th `rgb(223,19,28)`,
   500th–1250th `rgb(241,72,72)`.
+- **All twelve Special Harvest boxes always show; only the figures change**
+  (Chris, after seeing them hidden at small bands — he wants the layout he had).
+  A field size that does not fund a milestone shows **$0 on a dimmed bar** via
+  the plugin's own `dim_down_bar`. Do not go back to hiding them.
 - Headings **follow the band** (Chris, this session — this supersedes "Chris is
   rewording them himself in Elementor"). Each column is headed by the places it
   actually holds: "Scores 1st - 25th" / "Scores 26th - 51st" at a sellout,
@@ -285,6 +289,13 @@ widget exactly as it is.
   `apex-home-rewards.js`; `false` restores the literal 25-first rule. At 2,500
   both give exactly 25 | 26.
 - **Headings follow the band**, per Chris this session. See the design section.
+
+## Bumping the asset version matters
+
+`$ver` in `apex-payout-calculator.php` is the cache key on every `?ver=` query
+string. Overwriting an asset without bumping it leaves every browser — including
+yours while testing — running the old file, which looks exactly like a fix that
+did not work. It is at **1.0.3**. Bump it on every asset change.
 
 ## Still open
 

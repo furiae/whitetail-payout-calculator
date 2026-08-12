@@ -283,9 +283,8 @@
 	}
 
 	/**
-	 * Special Harvest. Rows are matched to the page's three groups by label
-	 * rather than written by key class: one copy of the section has duplicate
-	 * key classes, so keys alone are not a reliable address there.
+	 * Special Harvest. Every slot the page has is filled, in the order the page
+	 * lays them out; none is ever hidden.
 	 */
 	function fillSpecial(section, specialRows) {
 		var byLabel = {};
@@ -295,29 +294,25 @@
 			var rows = rowsWith(section, group.valueClass);
 			if (!rows.length) return;
 
-			/* Kept in the group's own order, so a prize lands in the slot whose
-			   wording names it. The engine drops milestones from the tail as
-			   the field shrinks, which is what keeps that true. `label: null`
-			   leaves the page's wording in place. */
-			var paying = group.keys
-				.map(function (key) {
-					var r = byLabel[key];
-					return r && r.amount > 0 ? { label: null, amount: r.amount } : null;
-				})
-				.filter(Boolean);
+			/* All twelve boxes always show and only the figures change - Chris's
+			   call, and how the page behaved before any of this. A field size
+			   that does not fund a milestone shows $0 on a dimmed bar, which is
+			   what dim_down_bar is for and what the plugin used to do.
 
+			   Slot i takes the prize named by key i, so a figure always sits
+			   beside the prize it belongs to. `label: null` leaves the page's
+			   own wording in place. */
 			rows.forEach(function (con, i) {
 				var widget = con.parentElement && con.parentElement.parentElement;
-				var row = paying[i];
-				if (!row) {
-					/* Hide what this field size does not pay rather than $0. */
-					if (widget) widget.style.display = 'none';
-					else con.style.display = 'none';
-					return;
-				}
+				var prize = byLabel[group.keys[i]];
+				var amount = prize ? prize.amount : 0;
+
+				/* Nothing here is ever hidden. */
 				if (widget) widget.style.display = '';
 				con.style.display = '';
-				paint(con, row, group.colour, 100);
+
+				paint(con, { label: null, amount: amount }, group.colour, 100);
+				if (!amount) con.classList.add('dim_down_bar');
 			});
 		});
 	}
