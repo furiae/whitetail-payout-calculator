@@ -69,30 +69,32 @@ In `wp-content/themes/astra-child-theme/`:
 - `assets/apex-payout-calculator.js` — the engine, plus a one-line
   `window.ApexPayouts = { buildBoard }` export.
 - `assets/apex-payout-calculator.css` — layout only; Astra supplies the rest.
-- `assets/apex-home-rewards.js` — home page view layer. The copy on staging is
-  the **old** one. **Uploaded but NOT active.**
-- `apex-payout-calculator.php` — enqueue file. **Uploaded but NOT active.**
+- `assets/apex-home-rewards.js` — home page view layer, 15,078 bytes. **Live.**
+- `assets/apex-home-rewards.css` — restores the bar's height, 1,416 bytes.
+  **Live**, and the view layer is broken without it.
+- `apex-payout-calculator.php` — enqueue file, 1,570 bytes. **Live.**
 
-`functions.php` is back to its original 36,139 bytes — the `require_once` line
-was removed. Nothing the previous session built is currently running on the
-home page.
+`functions.php` is 36,371 bytes: the original 36,141 untouched, plus the
+`require_once` block at the end. That block is the on/off switch — delete it and
+everything the calculator work added stops running.
 
-## The remaining job — the code is written, nothing is deployed
+## The remaining job — DONE and live on staging
 
 `wordpress/assets/apex-home-rewards.js` in this repo is a full rewrite that
 matches the approved design and passes `home-test.js` against the real page 52
 markup at all ten bands. `wordpress/assets/apex-home-rewards.css` is new and
 **must ship with it** (see "the bar has no height of its own" below).
 
-What is left is deployment, and it is all in WordPress:
+Deployed 11 Aug 2025. All three files were uploaded to
+`wp-content/themes/astra-child-theme/` and byte-verified, and `functions.php`
+went from 36,141 to 36,371 bytes — the original bytes untouched, with the
+`require_once` appended. On the live home page the board now reads $25,000 for
+1st, 25 | 26 places, 12 Special Harvest, headings following the band, and the
+ten dropdown bands all re-render. submit-score.js is still enqueued and only its
+band-dropdown handler is gone.
 
-1. Upload `assets/apex-home-rewards.js` (replacing the old one),
-   `assets/apex-home-rewards.css`, and `apex-payout-calculator.php` to
-   `wp-content/themes/astra-child-theme/`.
-2. Add the `require_once` line back to `functions.php` to activate the enqueue.
-3. Reload the home page and step through all ten bands.
-
-One design question is still open — see "Open questions" at the end.
+To roll back: delete the `require_once` block at the end of `functions.php`.
+That alone switches everything off; the assets can stay.
 
 ### Approved design
 
@@ -273,25 +275,26 @@ three copies of the section, wire the ten dropdown bands to
 `buildBoard(band, 225)`, and leave every heading, caption and surrounding
 widget exactly as it is.
 
-## Open questions for Chris
+## Answered this session — do not re-ask
 
-1. **How the two columns split below a sellout.** The approved mockup is
-   1st–25th | 26th–51st, which is the 2,500 board. Smaller bands pay fewer
-   places — 25 at 500 hunters, 15 at 250, 7 at 50 — and filling the left column
-   to 25 first would leave the right column empty for six of the ten bands,
-   with its heading standing over a gap. The shipped default therefore halves
-   the places below the cap, so the section stays two columns at every band
-   (`BALANCE_SMALL_BANDS` in `apex-home-rewards.js`; set it to `false` for the
-   literal 25-first rule). At 2,500 both give exactly 25 | 26. What this means
-   at band 50 is 1st–4th on the left and 5th–7th on the right.
-2. **Heading wording has to work across all ten bands**, not just at a sellout —
-   at 250 hunters the columns hold 1st–8th and 9th–15th. Wording is Chris's, but
-   worth knowing before he writes it. Say the word and the headings can be made
-   to follow the band automatically instead.
-3. The page's Special Harvest labels are inconsistent — the paid copy reads
-   "100th Place" and "200th Place" but then just "300th" and "400th", and
-   "1,000 Place" for 1,000th. Left alone deliberately, since captions are
-   Chris's. Worth a tidy in Elementor.
+- **How the two columns split below a sellout.** The approved mockup is
+  1st–25th | 26th–51st, which is the 2,500 board. Smaller bands pay fewer places
+  — 25 at 500 hunters, 15 at 250, 7 at 50 — so Chris chose to **halve the places
+  below the cap** rather than fill the left column to 25 first, which would have
+  left the right column empty for six of the ten bands. `BALANCE_SMALL_BANDS` in
+  `apex-home-rewards.js`; `false` restores the literal 25-first rule. At 2,500
+  both give exactly 25 | 26.
+- **Headings follow the band**, per Chris this session. See the design section.
+
+## Still open
+
+- The page's Special Harvest labels are inconsistent — the paid copy reads
+  "100th Place" and "200th Place" but then just "300th" and "400th", and
+  "1,000 Place" for 1,000th. Left alone deliberately: the view layer writes the
+  two columns' labels but never Special Harvest's, so this is copy to tidy in
+  Elementor whenever Chris wants.
+- Nothing has been pushed to GitHub this session. Three commits sit on the local
+  `feat/config-driven-payouts`; staging is ahead of the remote.
 
 ## Test suite for the home page
 
